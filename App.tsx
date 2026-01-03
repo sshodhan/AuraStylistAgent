@@ -75,7 +75,7 @@ const App: React.FC = () => {
         {activeTab === AppTab.VOICE && <VoiceTab weather={weather} unit={unit} />}
         {activeTab === AppTab.VISUALIZE && <VisualizeTab outfit={outfit} weather={weather} unit={unit} />}
         {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
-        {activeTab === AppTab.SETTINGS && <SettingsTab />}
+        {activeTab === AppTab.SETTINGS && <SettingsTab weather={weather} outfit={outfit} unit={unit} />}
       </main>
 
       {/* Navigation Footer */}

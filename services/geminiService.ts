@@ -48,6 +48,39 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   return JSON.parse(response.text);
 };
 
+/**
+ * Generates a professional email digest summarizing the weather and outfit.
+ */
+export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F'): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const displayTemp = convertTemp(weather.temp, unit);
+  
+  const prompt = `
+    Write a chic, professional, and brief "Daily Styling Digest" email for a client.
+    Location: ${weather.location}
+    Conditions: ${displayTemp}°${unit}, ${weather.precip}mm precip, ${weather.wind}km/h winds.
+    Recommended Look:
+    - Base: ${outfit.baseLayer}
+    - Outerwear: ${outfit.outerwear}
+    - Footwear: ${outfit.footwear}
+    - Stylist Tip: ${outfit.proTip}
+
+    Tone: Sophisticated, helpful, and concise (like a luxury fashion newsletter).
+    Include a catchy subject line at the very top, then the body.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      temperature: 0.7,
+      maxOutputTokens: 500,
+    }
+  });
+
+  return response.text || "Your daily style brief is ready.";
+};
+
 export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
