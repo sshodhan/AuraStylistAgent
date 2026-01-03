@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Clock, CheckCircle2, Eye, Loader2, X, Sparkles, User, AlertCircle, ChevronRight, Copy, ExternalLink, Send, Code, Terminal, Server, Globe } from 'lucide-react';
+import { Mail, Clock, CheckCircle2, Eye, Loader2, X, Sparkles, User, AlertCircle, ChevronRight, Copy, ExternalLink, Send, Code, Terminal, Server, Globe, ShieldCheck } from 'lucide-react';
 import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
 import { generateEmailDigest, getOutfitSuggestion } from '../services/geminiService';
 import { fetchWeather, geocode } from '../services/weatherService';
@@ -22,6 +22,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [digestContent, setDigestContent] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -45,6 +46,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
     setIsPreviewing(true);
     setIsGenerating(true);
     setDeliveryStatus('idle');
+    setErrorMessage(null);
     try {
       let currentOutfit = outfit;
       let currentWeather = weather;
@@ -69,12 +71,14 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   const handleLiveSend = async () => {
     if (!digestContent || !emailAddress) return;
     setIsSending(true);
+    setErrorMessage(null);
     const result = await sendRealEmail(emailAddress, "Aura Daily Style Briefing", digestContent);
     setIsSending(false);
     if (result.success) {
       setDeliveryStatus('success');
     } else {
       setDeliveryStatus('error');
+      setErrorMessage(result.error || "Check /api/send-email exists.");
     }
   };
 
@@ -95,13 +99,13 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Globe className="w-3 h-3 text-indigo-200" />
-              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Deployment Status</h2>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Live Integration</h2>
             </div>
-            <h2 className="text-sm font-black uppercase tracking-widest">Vercel + Resend</h2>
-            <p className="text-[10px] opacity-80 font-medium">Connect your stylist to the real world.</p>
+            <h2 className="text-sm font-black uppercase tracking-widest">Vercel Backend</h2>
+            <p className="text-[10px] opacity-80 font-medium">Email delivery via Resend active.</p>
           </div>
           <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-            <Server className="w-5 h-5" />
+            <ShieldCheck className="w-5 h-5" />
           </div>
         </div>
         <button 
@@ -109,7 +113,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
           className="w-full py-3 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
         >
           <Terminal className="w-4 h-4" />
-          Open Vercel Quickstart
+          Setup Vercel Key
         </button>
       </div>
 
@@ -168,7 +172,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
         >
           <div className="flex items-center gap-3">
             <Send className="w-5 h-5 text-indigo-600" />
-            <span className="text-xs font-black uppercase tracking-widest">Dispatch Test Email</span>
+            <span className="text-xs font-black uppercase tracking-widest">Send Live Test</span>
           </div>
           <ChevronRight className="w-4 h-4 opacity-50 group-hover:translate-x-1 transition-transform" />
         </button>
@@ -188,50 +192,54 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
         </button>
       </div>
 
-      {/* Vercel Guide Modal */}
+      {/* Personalized Guide Modal */}
       {showGuide && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50">
               <div className="flex items-center gap-3">
                 <Terminal className="text-indigo-600 w-5 h-5" />
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Vercel Quickstart</h3>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Vercel Integration</h3>
               </div>
               <button onClick={() => setShowGuide(false)} className="p-2 bg-white rounded-full shadow-sm">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-              <Step number={1} title="Sign up for Resend" desc="Get an API key from resend.com" />
-              <Step number={2} title="Create API Folder" desc="In your root, create folder 'api' and file 'send-email.ts'" />
-              
-              <div className="bg-gray-900 rounded-2xl p-5 overflow-x-auto relative group">
-                <div className="absolute top-3 right-3 flex gap-2">
-                   <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">send-email.ts</span>
+              <div className="p-5 bg-indigo-600 rounded-3xl text-white space-y-3 shadow-lg">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Your Resend Key Detected</p>
+                <div className="bg-black/20 p-3 rounded-xl font-mono text-[9px] break-all">
+                  re_bGKQVep3_9iNj...
                 </div>
-                <pre className="text-[10px] text-indigo-300 font-mono leading-loose">
-{`import { Resend } from 'resend';
-const resend = new Resend(process.env.RESEND_KEY);
+                <p className="text-[11px] font-medium leading-relaxed">
+                  I have configured the backend to use your key. Follow these final steps to go live:
+                </p>
+              </div>
 
-export default async function handler(req, res) {
-  const { to, subject, content } = req.body;
-  const { data, error } = await resend.emails.send({
-    from: 'Aura <hello@aura.style>',
-    to: [to],
-    subject,
-    html: \`<div>\${content.replace(/\\n/g, '<br>')}</div>\`
-  });
-  if (error) return res.status(400).json(error);
-  res.status(200).json(data);
-}`}
-                </pre>
+              <Step number={1} title="Set Environment Variable" desc="Go to Vercel Settings > Environment Variables." />
+              
+              <div className="bg-gray-100 rounded-2xl p-4 border border-gray-200 space-y-2">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vercel Config</span>
+                  <Copy className="w-3 h-3 text-gray-300" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-600 uppercase">Key:</p>
+                  <p className="text-[11px] font-mono text-indigo-600 bg-white p-2 rounded-lg border border-gray-100">RESEND_API_KEY</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-600 uppercase">Value:</p>
+                  <p className="text-[11px] font-mono text-indigo-600 bg-white p-2 rounded-lg border border-gray-100 truncate">re_bGKQVep3_9iNj9peMkh15gphJUdWHYPNt</p>
+                </div>
               </div>
               
-              <Step number={3} title="Set Vercel Secrets" desc="Add RESEND_KEY as an Environment Variable in Vercel settings." />
+              <Step number={2} title="Verify API Path" desc="The file /api/send-email.ts is already in your project root." />
+              <Step number={3} title="Push & Redeploy" desc="Commit your changes and push to GitHub. Vercel will handle the rest." />
               
-              <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                 <p className="text-[10px] text-indigo-600 font-bold leading-relaxed">
-                   Once deployed, your frontend will automatically find the /api endpoint and start sending real emails!
+              <div className="p-4 bg-green-50 rounded-2xl border border-green-100 flex gap-3">
+                 <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
+                 <p className="text-[10px] text-green-700 font-bold leading-relaxed">
+                   After redeploying, the "Send Live Test" button will start dispatching real emails to your Styling Address.
                  </p>
               </div>
             </div>
@@ -239,14 +247,14 @@ export default async function handler(req, res) {
         </div>
       )}
 
-      {/* Preview Modal */}
+      {/* Dispatch Modal */}
       {isPreviewing && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col h-[85dvh]">
             <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-white sticky top-0">
               <div className="flex items-center gap-3">
                 <Sparkles className="text-indigo-600 w-5 h-5" />
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Dispatch Console</h3>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Dispatch Center</h3>
               </div>
               <button onClick={() => setIsPreviewing(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
                 <X className="w-5 h-5 text-gray-400" />
@@ -261,7 +269,6 @@ export default async function handler(req, res) {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Delivery Status Indicator */}
                   {deliveryStatus !== 'idle' && (
                     <div className={`p-4 rounded-2xl flex items-center gap-3 border animate-in slide-in-from-top-2 ${
                       deliveryStatus === 'success' ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'
@@ -269,9 +276,9 @@ export default async function handler(req, res) {
                       {deliveryStatus === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                       <div className="flex-1">
                         <p className="text-[10px] font-black uppercase tracking-widest">
-                          {deliveryStatus === 'success' ? 'Email Successfully Routed' : 'API Connection Refused'}
+                          {deliveryStatus === 'success' ? 'Briefing Dispatched' : 'API Error'}
                         </p>
-                        {deliveryStatus === 'error' && <p className="text-[8px] font-medium mt-0.5 opacity-70">Check your Vercel logs and RESEND_KEY variable.</p>}
+                        {deliveryStatus === 'error' && <p className="text-[8px] font-medium mt-0.5 opacity-70">{errorMessage}</p>}
                       </div>
                     </div>
                   )}
@@ -288,7 +295,7 @@ export default async function handler(req, res) {
                       className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-lg shadow-indigo-100 disabled:bg-gray-200 disabled:shadow-none"
                     >
                       {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      {deliveryStatus === 'success' ? "Dispatched" : "Transmit to Stylist Hub"}
+                      {deliveryStatus === 'success' ? "Message Delivered" : "Send Real Briefing"}
                     </button>
                     
                     <div className="flex gap-3">
@@ -304,7 +311,7 @@ export default async function handler(req, res) {
                         className="flex-1 py-4 bg-gray-100 text-gray-600 border border-gray-200 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        Client App
+                        Draft Mail
                       </a>
                     </div>
                   </div>
