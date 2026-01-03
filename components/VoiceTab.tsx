@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { WeatherData, TempUnit } from '../types';
 import { encode, decode, decodeAudioData } from '../services/geminiService';
-import { Mic, MicOff, Volume2, Loader2, Info, X, PhoneOff, MessageSquare } from 'lucide-react';
+import { Mic, MicOff, Volume2, Loader2, Info, X, PhoneOff, MessageSquare, AlertCircle } from 'lucide-react';
 
 interface Props {
   weather: WeatherData | null;
@@ -13,6 +12,7 @@ interface Props {
 const VoiceTab: React.FC<Props> = ({ weather, unit }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<string[]>([]);
   const [showTranscript, setShowTranscript] = useState(false);
   
@@ -25,14 +25,19 @@ const VoiceTab: React.FC<Props> = ({ weather, unit }) => {
 
   const startSession = async () => {
     setIsConnecting(true);
+    setPermissionError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      // Ensure AudioContexts are running (browsers often suspend them)
+      if (audioContextRef.current.state === 'suspended') await audioContextRef.current.resume();
+      if (outputAudioContextRef.current.state === 'suspended') await outputAudioContextRef.current.resume();
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -85,12 +90,17 @@ const VoiceTab: React.FC<Props> = ({ weather, unit }) => {
             }
 
             if (message.serverContent?.interrupted) {
-              sourcesRef.current.forEach(s => s.stop());
+              sourcesRef.current.forEach(s => {
+                try { s.stop(); } catch(e) {}
+              });
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
             }
           },
-          onerror: (e) => console.error("Live Error", e),
+          onerror: (e) => {
+            console.error("Live Error", e);
+            setPermissionError("Connection error. Please try again.");
+          },
           onclose: () => {
             setIsConnected(false);
             setIsConnecting(false);
@@ -106,9 +116,14 @@ const VoiceTab: React.FC<Props> = ({ weather, unit }) => {
       });
 
       sessionRef.current = await sessionPromise;
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setIsConnecting(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setPermissionError("Microphone access denied. Please enable permissions in your browser settings.");
+      } else {
+        setPermissionError("Could not start voice session. Check your internet and permissions.");
+      }
     }
   };
 
@@ -162,13 +177,21 @@ const VoiceTab: React.FC<Props> = ({ weather, unit }) => {
           </div>
 
           {!isConnected ? (
-            <button
-              onClick={startSession}
-              disabled={isConnecting}
-              className="px-10 py-5 bg-indigo-600 text-white rounded-full font-black text-sm uppercase tracking-widest shadow-2xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-3"
-            >
-              {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Start Session"}
-            </button>
+            <div className="space-y-4">
+              <button
+                onClick={startSession}
+                disabled={isConnecting}
+                className="px-10 py-5 bg-indigo-600 text-white rounded-full font-black text-sm uppercase tracking-widest shadow-2xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-3"
+              >
+                {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Start Session"}
+              </button>
+              {permissionError && (
+                <div className="flex items-center gap-2 justify-center text-red-500 text-[10px] font-black uppercase tracking-widest animate-in fade-in">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{permissionError}</span>
+                </div>
+              )}
+            </div>
           ) : (
             <button
               onClick={stopSession}

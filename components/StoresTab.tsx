@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { WeatherData, OutfitSuggestion, GroundingLink } from '../types';
 import { getStoreLocations } from '../services/geminiService';
-import { MapPin, ExternalLink, Loader2, ShoppingBag, Navigation } from 'lucide-react';
+import { MapPin, ExternalLink, Loader2, ShoppingBag, Navigation, AlertCircle } from 'lucide-react';
 
 interface Props {
   weather: WeatherData | null;
@@ -19,24 +18,40 @@ const StoresTab: React.FC<Props> = ({ weather, outfit }) => {
     if (!weather || !outfit) return;
     setLoading(true);
     setError(null);
+    
+    const defaultLat = 47.6062;
+    const defaultLon = -122.3321;
+
     try {
-      let lat = 47.6062;
-      let lon = -122.3321;
-      
       if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-          const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, pos.coords.latitude, pos.coords.longitude);
-          setRecommendations(result.text);
-          setLinks(result.links);
-          setLoading(false);
-        }, async () => {
-          const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, lat, lon);
-          setRecommendations(result.text);
-          setLinks(result.links);
-          setLoading(false);
-        });
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            try {
+              const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, pos.coords.latitude, pos.coords.longitude);
+              setRecommendations(result.text);
+              setLinks(result.links);
+              setLoading(false);
+            } catch (err) {
+              setError("Failed to fetch store data.");
+              setLoading(false);
+            }
+          }, 
+          async (geoErr) => {
+            console.warn("Geolocation blocked or failed:", geoErr);
+            setError("Location access denied. Using city default.");
+            try {
+              const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, defaultLat, defaultLon);
+              setRecommendations(result.text);
+              setLinks(result.links);
+            } catch (err) {
+              setError("Failed to fetch store data.");
+            }
+            setLoading(false);
+          },
+          { timeout: 10000 }
+        );
       } else {
-        const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, lat, lon);
+        const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, defaultLat, defaultLon);
         setRecommendations(result.text);
         setLinks(result.links);
         setLoading(false);
@@ -81,6 +96,13 @@ const StoresTab: React.FC<Props> = ({ weather, outfit }) => {
           Refresh
         </button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-100 animate-in fade-in">
+          <AlertCircle className="w-4 h-4" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="flex-1 space-y-4">
         {loading ? (
