@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppTab, WeatherData, OutfitSuggestion, TempUnit } from './types';
 import StylistTab from './components/StylistTab';
 import VoiceTab from './components/VoiceTab';
@@ -29,26 +29,26 @@ const App: React.FC = () => {
     : null;
 
   return (
-    <div className="min-h-screen flex flex-col max-w-4xl mx-auto bg-white shadow-xl overflow-hidden">
-      {/* Header */}
-      <header className="p-6 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+    <div className="h-[100dvh] w-full max-w-md mx-auto flex flex-col bg-white overflow-hidden relative selection:bg-indigo-100">
+      {/* Fixed App Header */}
+      <header className="px-5 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md z-30 shrink-0 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <div className="bg-indigo-600 p-2 rounded-xl">
-            <Cloud className="text-white w-6 h-6" />
+          <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-100">
+            <Cloud className="text-white w-5 h-5" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Aura Stylist</h1>
+          <h1 className="text-lg font-black text-gray-900 tracking-tight">Aura</h1>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="flex bg-gray-100 p-1 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
             {(['C', 'F'] as TempUnit[]).map((u) => (
               <button
                 key={u}
                 onClick={() => setUnit(u)}
-                className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${
                   unit === u 
                     ? 'bg-white text-indigo-600 shadow-sm' 
-                    : 'text-gray-400 hover:text-gray-600'
+                    : 'text-gray-400'
                 }`}
               >
                 °{u}
@@ -56,38 +56,41 @@ const App: React.FC = () => {
             ))}
           </div>
           {weather && (
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{weather.location}</p>
-              <p className="text-xl font-black text-indigo-600 leading-none">{displayTemp}°{unit}</p>
+            <div className="bg-indigo-50 px-2 py-1 rounded-lg">
+              <p className="text-[10px] font-black text-indigo-600 leading-none">{displayTemp}°{unit}</p>
             </div>
           )}
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        {activeTab === AppTab.STYLIST && (
-          <StylistTab 
-            unit={unit}
-            weather={weather}
-            weatherHero={weatherHero}
-            outfitImage={outfitImage}
-            onWeatherUpdate={setWeather} 
-            onOutfitUpdate={setOutfit} 
-            onHeroUpdate={setWeatherHero}
-            onOutfitImageUpdate={setOutfitImage}
-            currentOutfit={outfit} 
-          />
-        )}
-        {activeTab === AppTab.VOICE && <VoiceTab weather={weather} unit={unit} />}
-        {activeTab === AppTab.VISUALIZE && <VisualizeTab outfit={outfit} weather={weather} unit={unit} />}
-        {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
-        {activeTab === AppTab.SETTINGS && <SettingsTab weather={weather} outfit={outfit} unit={unit} />}
+      {/* Internal Scrollable Content Area */}
+      <main className="flex-1 overflow-hidden relative">
+        <div className="h-full w-full overflow-y-auto overscroll-contain">
+          <div className="p-4 space-y-4">
+            {activeTab === AppTab.STYLIST && (
+              <StylistTab 
+                unit={unit}
+                weather={weather}
+                weatherHero={weatherHero}
+                outfitImage={outfitImage}
+                onWeatherUpdate={setWeather} 
+                onOutfitUpdate={setOutfit} 
+                onHeroUpdate={setWeatherHero}
+                onOutfitImageUpdate={setOutfitImage}
+                currentOutfit={outfit} 
+              />
+            )}
+            {activeTab === AppTab.VOICE && <VoiceTab weather={weather} unit={unit} />}
+            {activeTab === AppTab.VISUALIZE && <VisualizeTab outfit={outfit} weather={weather} unit={unit} />}
+            {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
+            {activeTab === AppTab.SETTINGS && <SettingsTab weather={weather} outfit={outfit} unit={unit} />}
+          </div>
+        </div>
       </main>
 
-      {/* Navigation Footer */}
-      <nav className="border-t bg-gray-50/80 backdrop-blur-md p-3 sticky bottom-0">
-        <div className="flex justify-around items-center">
+      {/* Fixed Bottom Navigation */}
+      <nav className="border-t border-gray-100 bg-white/95 backdrop-blur-md px-2 py-3 shrink-0 z-30 shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
+        <div className="flex justify-around items-center max-w-lg mx-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -95,14 +98,19 @@ const App: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${
+                className={`flex flex-col items-center gap-1.5 px-3 py-1 rounded-2xl transition-all duration-300 relative ${
                   isActive 
-                    ? 'text-indigo-600 scale-110 font-bold' 
-                    : 'text-gray-400 hover:text-gray-600'
+                    ? 'text-indigo-600 scale-105' 
+                    : 'text-gray-400'
                 }`}
               >
-                <Icon className={`w-6 h-6 ${isActive ? 'fill-indigo-50' : ''}`} />
-                <span className="text-[10px] uppercase tracking-widest">{tab.label}</span>
+                <Icon className={`w-5 h-5 ${isActive ? 'fill-indigo-50' : ''}`} />
+                <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                  {tab.label}
+                </span>
+                {isActive && (
+                  <div className="absolute -bottom-2 w-1 h-1 bg-indigo-600 rounded-full" />
+                )}
               </button>
             );
           })}
