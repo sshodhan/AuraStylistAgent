@@ -72,6 +72,35 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
   throw new Error("No image generated");
 };
 
+/**
+ * Generates an atmospheric hero image of the weather conditions using 'gemini-2.5-flash-image' (nano banana).
+ */
+export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const displayTemp = convertTemp(weather.temp, unit);
+  
+  const prompt = `A cinematic landscape photograph of ${weather.location} showing the actual atmospheric weather conditions: ${displayTemp}°${unit}, ${weather.precip}mm rain/snow, and ${weather.wind}km/h wind. Focus on the sky, lighting, and mood. Photorealistic, wide-angle.`;
+  
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [{ text: prompt }]
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: "16:9"
+      }
+    }
+  });
+
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return `data:image/png;base64,${part.inlineData.data}`;
+    }
+  }
+  throw new Error("No weather hero generated");
+};
+
 export const getStoreLocations = async (location: string, outfitItem: string, lat: number, lon: number) => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const response = await ai.models.generateContent({
