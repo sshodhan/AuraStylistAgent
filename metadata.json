@@ -1,0 +1,13 @@
+{
+  "name": "Aura:Weather-Aware Stylist",
+  "short_name": "Aura",
+  "description": "An AI-powered professional fashion agent that analyzes real-time weather and location data to suggest the perfect outfit.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
