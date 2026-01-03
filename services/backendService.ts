@@ -6,9 +6,14 @@
  * Path: /api/send-email.ts
  */
 
-export const sendRealEmail = async (to: string, subject: string, content: string): Promise<{ success: boolean; error?: string }> => {
+export const sendRealEmail = async (
+  to: string, 
+  subject: string, 
+  content: string, 
+  userName?: string, 
+  imageUrl?: string
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Relative path works automatically when deployed on the same Vercel domain
     const API_ENDPOINT = '/api/send-email'; 
 
     const response = await fetch(API_ENDPOINT, {
@@ -20,6 +25,8 @@ export const sendRealEmail = async (to: string, subject: string, content: string
         to,
         subject,
         content,
+        userName,
+        imageUrl,
       }),
     });
 

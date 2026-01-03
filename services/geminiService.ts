@@ -49,12 +49,12 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
 /**
  * Generates a professional email digest summarizing the weather and outfit.
  */
-export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F'): Promise<string> => {
+export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F', userName: string = ''): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const displayTemp = convertTemp(weather.temp, unit);
   
   const prompt = `
-    Write a chic, professional, and brief "Daily Styling Digest" email for a client.
+    Write a chic, professional, and brief "Daily Styling Digest" for a client named ${userName || 'Fashionista'}.
     Location: ${weather.location}
     Conditions: ${displayTemp}°${unit}, ${weather.precip}mm precip, ${weather.wind}km/h winds.
     Recommended Look:
@@ -63,8 +63,9 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
     - Footwear: ${outfit.footwear}
     - Stylist Tip: ${outfit.proTip}
 
-    Tone: Sophisticated, helpful, and concise (like a luxury fashion newsletter).
-    Include a catchy subject line at the very top, then the body.
+    Tone: Sophisticated, helpful, and concise. 
+    Do NOT include a subject line in the text output, just the body content.
+    Greet them warmly at the beginning.
   `;
 
   const response = await ai.models.generateContent({

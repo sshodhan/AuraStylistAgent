@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Clock, CheckCircle2, Eye, Loader2, X, Sparkles, User, AlertCircle, ChevronRight, Copy, ExternalLink, Send, Code, Terminal, Server, Globe, ShieldCheck } from 'lucide-react';
+import { Mail, Clock, CheckCircle2, Eye, Loader2, X, Sparkles, User, AlertCircle, ChevronRight, Copy, ExternalLink, Send, Code, Terminal, Server, Globe, ShieldCheck, Heart } from 'lucide-react';
 import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
-import { generateEmailDigest, getOutfitSuggestion } from '../services/geminiService';
+import { generateEmailDigest, getOutfitSuggestion, generateOutfitImage } from '../services/geminiService';
 import { fetchWeather, geocode } from '../services/weatherService';
 import { sendRealEmail } from '../services/backendService';
 
@@ -13,6 +13,7 @@ interface Props {
 }
 
 const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
+  const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "");
   const [emailAddress, setEmailAddress] = useState(() => localStorage.getItem('aura_email_address') || "");
   const [emailEnabled, setEmailEnabled] = useState(() => localStorage.getItem('aura_email_enabled') === 'true');
   const [sendTime, setSendTime] = useState(() => localStorage.getItem('aura_send_time') || "07:30");
@@ -25,14 +26,16 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [digestContent, setDigestContent] = useState<string | null>(null);
+  const [digestImage, setDigestImage] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [copyStatus, setCopyStatus] = useState(false);
 
   useEffect(() => {
+    localStorage.setItem('aura_user_name', userName);
     localStorage.setItem('aura_email_address', emailAddress);
     localStorage.setItem('aura_email_enabled', String(emailEnabled));
     localStorage.setItem('aura_send_time', sendTime);
-  }, [emailAddress, emailEnabled, sendTime]);
+  }, [userName, emailAddress, emailEnabled, sendTime]);
 
   const handleManualSave = () => {
     setSaveStatus('saving');
@@ -50,16 +53,26 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
     try {
       let currentOutfit = outfit;
       let currentWeather = weather;
+      
+      // Ensure we have weather and outfit for the digest
       if (!currentWeather) {
         const coords = await geocode('Seattle');
         if (coords) currentWeather = await fetchWeather(coords.lat, coords.lon, 'Seattle');
       }
+      
       if (currentWeather && !currentOutfit) {
         currentOutfit = await getOutfitSuggestion(currentWeather, 'professional', unit);
       }
+      
       if (currentWeather && currentOutfit) {
-        const content = await generateEmailDigest(currentWeather, currentOutfit, unit);
+        // Generate digest text and an outfit image simultaneously
+        const [content, image] = await Promise.all([
+          generateEmailDigest(currentWeather, currentOutfit, unit, userName),
+          generateOutfitImage(currentOutfit, currentWeather, "1K", unit).catch(() => null)
+        ]);
+        
         setDigestContent(content);
+        setDigestImage(image);
       }
     } catch (err) {
       setDigestContent("Could not generate brief. Check API key.");
@@ -69,10 +82,15 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   };
 
   const handleLiveSend = async () => {
-    if (!digestContent || !emailAddress) return;
+    if (!digestContent || !emailAddress || !weather) return;
     setIsSending(true);
     setErrorMessage(null);
-    const result = await sendRealEmail(emailAddress, "Aura Daily Style Briefing", digestContent);
+    
+    // Construct sophisticated subject with Date and Location
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const subject = `Aura Style Briefing | ${dateStr} | ${weather.location}`;
+    
+    const result = await sendRealEmail(emailAddress, subject, digestContent, userName, digestImage || undefined);
     setIsSending(false);
     if (result.success) {
       setDeliveryStatus('success');
@@ -101,7 +119,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
               <Globe className="w-3 h-3 text-indigo-200" />
               <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Live Integration</h2>
             </div>
-            <h2 className="text-sm font-black uppercase tracking-widest">Vercel Backend</h2>
+            <h2 className="text-sm font-black uppercase tracking-widest">Aura Dispatch</h2>
             <p className="text-[10px] opacity-80 font-medium">Email delivery via Resend active.</p>
           </div>
           <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
@@ -113,20 +131,35 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
           className="w-full py-3 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
         >
           <Terminal className="w-4 h-4" />
-          Setup Vercel Key
+          View Setup Config
         </button>
       </div>
 
       {/* Identity Group */}
       <div className="space-y-2">
-        <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">User Profile</h3>
-        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-          <div className="p-4 flex items-center gap-4">
+        <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Identity</h3>
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm divide-y divide-gray-50">
+          <div className="p-5 flex items-center gap-4">
+            <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shrink-0">
+              <Heart className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Your Name</p>
+              <input 
+                type="text" 
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="What should Aura call you?"
+                className="w-full bg-transparent border-none outline-none text-sm font-black text-gray-900 p-0" 
+              />
+            </div>
+          </div>
+          <div className="p-5 flex items-center gap-4">
             <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shrink-0">
               <User className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter mb-1">Styling Address</p>
+              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Delivery Address</p>
               <input 
                 type="email" 
                 value={emailAddress}
@@ -142,7 +175,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
       {/* Automation Group */}
       <div className="space-y-2">
         <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Automation</h3>
-        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm divide-y divide-gray-50">
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm divide-y divide-gray-50">
           <SettingToggle 
             icon={<Mail className="w-4 h-4" />} 
             label="Live Daily Delivery" 
@@ -168,21 +201,23 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
       <div className="space-y-3 pt-2">
         <button
           onClick={handlePreview}
-          className="w-full p-5 bg-white border border-gray-100 text-gray-900 rounded-3xl flex items-center justify-between group active:scale-[0.98] transition-all shadow-sm"
+          className="w-full p-6 bg-white border border-gray-100 text-gray-900 rounded-[2rem] flex items-center justify-between group active:scale-[0.98] transition-all shadow-sm"
         >
           <div className="flex items-center gap-3">
-            <Send className="w-5 h-5 text-indigo-600" />
-            <span className="text-xs font-black uppercase tracking-widest">Send Live Test</span>
+            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-100">
+              <Send className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-widest">Send Live Test Brief</span>
           </div>
-          <ChevronRight className="w-4 h-4 opacity-50 group-hover:translate-x-1 transition-transform" />
+          <ChevronRight className="w-4 h-4 opacity-30 group-hover:translate-x-1 transition-transform" />
         </button>
 
         <button
           onClick={handleManualSave}
           disabled={saveStatus !== 'idle'}
-          className="w-full p-5 bg-gray-50 text-gray-400 rounded-3xl flex items-center justify-between group active:scale-[0.98] transition-all"
+          className="w-full p-5 bg-gray-50 text-gray-400 rounded-[2rem] flex items-center justify-between group active:scale-[0.98] transition-all"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 px-1">
             <CheckCircle2 className={`w-5 h-5 ${saveStatus === 'saved' ? 'text-green-500' : 'text-gray-300'}`} />
             <span className="text-xs font-black uppercase tracking-widest">
               {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Preferences Active' : 'Update Preferences'}
@@ -212,34 +247,18 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                   re_bGKQVep3_9iNj...
                 </div>
                 <p className="text-[11px] font-medium leading-relaxed">
-                  I have configured the backend to use your key. Follow these final steps to go live:
+                  The backend is configured to use your key. Note: Emails include a personalized greeting and visual outfit preview.
                 </p>
               </div>
 
-              <Step number={1} title="Set Environment Variable" desc="Go to Vercel Settings > Environment Variables." />
-              
-              <div className="bg-gray-100 rounded-2xl p-4 border border-gray-200 space-y-2">
-                <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vercel Config</span>
-                  <Copy className="w-3 h-3 text-gray-300" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-gray-600 uppercase">Key:</p>
-                  <p className="text-[11px] font-mono text-indigo-600 bg-white p-2 rounded-lg border border-gray-100">RESEND_API_KEY</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-gray-600 uppercase">Value:</p>
-                  <p className="text-[11px] font-mono text-indigo-600 bg-white p-2 rounded-lg border border-gray-100 truncate">re_bGKQVep3_9iNj9peMkh15gphJUdWHYPNt</p>
-                </div>
-              </div>
-              
-              <Step number={2} title="Verify API Path" desc="The file /api/send-email.ts is already in your project root." />
-              <Step number={3} title="Push & Redeploy" desc="Commit your changes and push to GitHub. Vercel will handle the rest." />
+              <Step number={1} title="Vercel Config" desc="Add RESEND_API_KEY with your key in Vercel settings." />
+              <Step number={2} title="Serverless Path" desc="/api/send-email.ts is ready in your project root." />
+              <Step number={3} title="Dispatch" desc="The 'Send Live Test' button now transmits name, date, and visual data." />
               
               <div className="p-4 bg-green-50 rounded-2xl border border-green-100 flex gap-3">
                  <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
                  <p className="text-[10px] text-green-700 font-bold leading-relaxed">
-                   After redeploying, the "Send Live Test" button will start dispatching real emails to your Styling Address.
+                   Briefings will now arrive in your inbox with a rich layout including today's generated look.
                  </p>
               </div>
             </div>
@@ -264,8 +283,11 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
             <div className="flex-1 overflow-y-auto p-8 bg-gray-50/20 custom-scrollbar">
               {isGenerating ? (
                 <div className="flex flex-col items-center justify-center py-24 gap-4">
-                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Syncing Styles...</p>
+                  <div className="relative">
+                    <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                    <Heart className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-pulse" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Personalizing Briefing...</p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -276,16 +298,24 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                       {deliveryStatus === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                       <div className="flex-1">
                         <p className="text-[10px] font-black uppercase tracking-widest">
-                          {deliveryStatus === 'success' ? 'Briefing Dispatched' : 'API Error'}
+                          {deliveryStatus === 'success' ? `Delivered to ${userName || 'you'}` : 'API Error'}
                         </p>
                         {deliveryStatus === 'error' && <p className="text-[8px] font-medium mt-0.5 opacity-70">{errorMessage}</p>}
                       </div>
                     </div>
                   )}
 
-                  <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm text-xs font-medium leading-loose whitespace-pre-wrap italic text-gray-600 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 opacity-20" />
-                    {digestContent}
+                  <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+                    {digestImage && (
+                      <div className="aspect-[4/3] w-full relative">
+                        <img src={digestImage} alt="Outfit preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20" />
+                      </div>
+                    )}
+                    <div className="p-8 text-xs font-medium leading-loose whitespace-pre-wrap italic text-gray-600 relative">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 opacity-20" />
+                      {digestContent}
+                    </div>
                   </div>
                   
                   <div className="flex flex-col gap-3">
