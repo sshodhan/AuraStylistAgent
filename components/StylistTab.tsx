@@ -7,20 +7,32 @@ import { Search, Loader2, Thermometer, Wind, CloudRain, AlertCircle, Sparkles, C
 
 interface Props {
   unit: TempUnit;
+  weather: WeatherData | null;
+  weatherHero: string | null;
+  outfitImage: string | null;
   onWeatherUpdate: (w: WeatherData) => void;
   onOutfitUpdate: (o: OutfitSuggestion) => void;
+  onHeroUpdate: (h: string | null) => void;
+  onOutfitImageUpdate: (img: string | null) => void;
   currentOutfit: OutfitSuggestion | null;
 }
 
-const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, currentOutfit }) => {
+const StylistTab: React.FC<Props> = ({ 
+  unit, 
+  weather, 
+  weatherHero, 
+  outfitImage, 
+  onWeatherUpdate, 
+  onOutfitUpdate, 
+  onHeroUpdate,
+  onOutfitImageUpdate,
+  currentOutfit 
+}) => {
   const [locationInput, setLocationInput] = useState('Seattle');
   const [context, setContext] = useState('casual');
   const [loading, setLoading] = useState(false);
   const [visualizing, setVisualizing] = useState(false);
-  const [outfitImage, setOutfitImage] = useState<string | null>(null);
-  const [weatherHero, setWeatherHero] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [weatherInfo, setWeatherInfo] = useState<WeatherData | null>(null);
 
   const contexts = ['casual', 'formal office', 'casual hike', 'night out', 'athletic'];
 
@@ -28,25 +40,24 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
-    setOutfitImage(null);
-    setWeatherHero(null);
+    onOutfitImageUpdate(null);
+    onHeroUpdate(null);
 
     try {
       const coords = await geocode(locationInput);
       if (!coords) throw new Error("Could not find location.");
 
-      const weather = await fetchWeather(coords.lat, coords.lon, locationInput);
-      setWeatherInfo(weather);
-      onWeatherUpdate(weather);
+      const weatherData = await fetchWeather(coords.lat, coords.lon, locationInput);
+      onWeatherUpdate(weatherData);
 
       // Trigger parallel generations
       const [suggestion, hero] = await Promise.all([
-        getOutfitSuggestion(weather, context, unit),
-        generateWeatherHeroImage(weather, unit).catch(() => null)
+        getOutfitSuggestion(weatherData, context, unit),
+        generateWeatherHeroImage(weatherData, unit).catch(() => null)
       ]);
 
       onOutfitUpdate(suggestion);
-      setWeatherHero(hero);
+      onHeroUpdate(hero);
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -55,7 +66,7 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
   };
 
   const handleVisualize = async () => {
-    if (!currentOutfit || !weatherInfo) return;
+    if (!currentOutfit || !weather) return;
 
     if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
       const hasKey = await (window as any).aistudio.hasSelectedApiKey();
@@ -67,8 +78,8 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
     setVisualizing(true);
     setError(null);
     try {
-      const url = await generateOutfitImage(currentOutfit, weatherInfo, "1K", unit);
-      setOutfitImage(url);
+      const url = await generateOutfitImage(currentOutfit, weather, "1K", unit);
+      onOutfitImageUpdate(url);
     } catch (err: any) {
       if (err.message?.includes("Requested entity was not found")) {
         setError("Please re-select your API key with a paid project.");
@@ -84,7 +95,10 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
   };
 
   useEffect(() => {
-    if (!currentOutfit) handleGenerate();
+    // Only auto-generate if we have absolutely no data yet
+    if (!currentOutfit && !weather) {
+      handleGenerate();
+    }
   }, []);
 
   const getDisplayTemp = (c: number) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c.toFixed(1);
@@ -100,20 +114,20 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Climate Hero Component */}
-      {weatherInfo && !loading && (
+      {(weather || loading) && (
         <div className="relative w-full aspect-[21/9] md:aspect-[3/1] bg-gray-200 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 group">
-          {weatherHero ? (
+          {weatherHero && !loading ? (
             <>
               <img src={weatherHero} alt="Climate Hero" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
               
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent p-8 flex flex-col justify-between">
                 <div className="flex justify-between items-start">
                   <div className="bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-2xl flex items-center gap-3">
-                    {getWeatherIcon(weatherInfo.precip, weatherInfo.temp)}
+                    {getWeatherIcon(weather.precip, weather.temp)}
                     <div className="text-white">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-none">Status</p>
                       <p className="text-base font-black">
-                        {weatherInfo.precip > 5 ? 'Stormy' : weatherInfo.precip > 0 ? 'Rainy' : weatherInfo.temp > 20 ? 'Sunny' : 'Cloudy'}
+                        {weather.precip > 5 ? 'Stormy' : weather.precip > 0 ? 'Rainy' : weather.temp > 20 ? 'Sunny' : 'Cloudy'}
                       </p>
                     </div>
                   </div>
@@ -121,13 +135,13 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
                   <div className="bg-black/20 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl text-right">
                     <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none">Real-Time</p>
                     <p className="text-2xl font-black text-white leading-none mt-1">
-                      {getDisplayTemp(weatherInfo.temp)}°<span className="opacity-60">{unit}</span>
+                      {getDisplayTemp(weather.temp)}°<span className="opacity-60">{unit}</span>
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <h3 className="text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-2xl">{weatherInfo.location}</h3>
+                  <h3 className="text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-2xl">{weather.location}</h3>
                 </div>
               </div>
             </>
@@ -142,7 +156,7 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
         </div>
       )}
 
-      {/* Search Input Section - Shaded wrapper to match screenshot */}
+      {/* Search Input Section */}
       <div className="bg-gray-50 p-5 rounded-[2.5rem] border border-gray-100">
         <section className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
           <h2 className="text-xl font-black text-gray-900 tracking-tight">Where are you heading?</h2>
@@ -183,12 +197,12 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
         </div>
       )}
 
-      {currentOutfit && weatherInfo && !loading && (
+      {currentOutfit && weather && !loading && (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-4 px-2">
-            <WeatherCard icon={<Thermometer className="w-5 h-5" />} label="Temp" value={`${getDisplayTemp(weatherInfo.temp)}°${unit}`} />
-            <WeatherCard icon={<CloudRain className="w-5 h-5" />} label="Precip" value={`${weatherInfo.precip}mm`} />
-            <WeatherCard icon={<Wind className="w-5 h-5" />} label="Wind" value={`${weatherInfo.wind}km/h`} />
+            <WeatherCard icon={<Thermometer className="w-5 h-5" />} label="Temp" value={`${getDisplayTemp(weather.temp)}°${unit}`} />
+            <WeatherCard icon={<CloudRain className="w-5 h-5" />} label="Precip" value={`${weather.precip}mm`} />
+            <WeatherCard icon={<Wind className="w-5 h-5" />} label="Wind" value={`${weather.wind}km/h`} />
           </div>
 
           <div className="bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden ring-1 ring-black/5">
@@ -259,7 +273,7 @@ const StylistTab: React.FC<Props> = ({ unit, onWeatherUpdate, onOutfitUpdate, cu
                         </div>
                         <div className="space-y-3">
                           <p className="text-gray-900 font-black text-lg">Visualize the look</p>
-                          <p className="text-sm text-gray-500 max-w-[250px] mx-auto leading-relaxed">See how this outfit interacts with {weatherInfo.location}'s current climate conditions.</p>
+                          <p className="text-sm text-gray-500 max-w-[250px] mx-auto leading-relaxed">See how this outfit interacts with {weather.location}'s current climate conditions.</p>
                         </div>
                         <button
                           onClick={handleVisualize}

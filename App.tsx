@@ -12,6 +12,8 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.STYLIST);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [outfit, setOutfit] = useState<OutfitSuggestion | null>(null);
+  const [weatherHero, setWeatherHero] = useState<string | null>(null);
+  const [outfitImage, setOutfitImage] = useState<string | null>(null);
   const [unit, setUnit] = useState<TempUnit>('F');
 
   const tabs = [
@@ -67,8 +69,13 @@ const App: React.FC = () => {
         {activeTab === AppTab.STYLIST && (
           <StylistTab 
             unit={unit}
+            weather={weather}
+            weatherHero={weatherHero}
+            outfitImage={outfitImage}
             onWeatherUpdate={setWeather} 
             onOutfitUpdate={setOutfit} 
+            onHeroUpdate={setWeatherHero}
+            onOutfitImageUpdate={setOutfitImage}
             currentOutfit={outfit} 
           />
         )}

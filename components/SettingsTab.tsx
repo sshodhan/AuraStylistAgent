@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Bell, Clock, Calendar, Smartphone, CheckCircle2, Eye, Loader2, Send, X, Sparkles, MapPin } from 'lucide-react';
+import { Mail, Bell, Clock, Calendar, Smartphone, CheckCircle2, Eye, Loader2, Send, X, Sparkles, User, AlertCircle } from 'lucide-react';
 import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
 import { generateEmailDigest, getOutfitSuggestion } from '../services/geminiService';
 import { fetchWeather, geocode } from '../services/weatherService';
@@ -13,6 +13,7 @@ interface Props {
 
 const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   // Load initial state from localStorage
+  const [emailAddress, setEmailAddress] = useState(() => localStorage.getItem('aura_email_address') || "");
   const [emailEnabled, setEmailEnabled] = useState(() => localStorage.getItem('aura_email_enabled') === 'true');
   const [pushEnabled, setPushEnabled] = useState(() => {
     const stored = localStorage.getItem('aura_push_enabled');
@@ -22,19 +23,21 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testSent, setTestSent] = useState(false);
   const [digestContent, setDigestContent] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Automatically persist changes to localStorage when states change
+  // Automatically persist changes to localStorage
   useEffect(() => {
+    localStorage.setItem('aura_email_address', emailAddress);
     localStorage.setItem('aura_email_enabled', String(emailEnabled));
     localStorage.setItem('aura_push_enabled', String(pushEnabled));
     localStorage.setItem('aura_send_time', sendTime);
-  }, [emailEnabled, pushEnabled, sendTime]);
+  }, [emailAddress, emailEnabled, pushEnabled, sendTime]);
 
   const handleManualSave = () => {
     setSaveStatus('saving');
-    // Values are already saved by useEffect, but we provide visual feedback
     setTimeout(() => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -44,11 +47,11 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   const handlePreview = async () => {
     setIsPreviewing(true);
     setIsGenerating(true);
+    setTestSent(false);
     try {
       let currentOutfit = outfit;
       let currentWeather = weather;
 
-      // If no context, get default for Seattle as a fallback
       if (!currentWeather) {
         const coords = await geocode('Seattle');
         if (coords) {
@@ -73,20 +76,57 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
     }
   };
 
+  const handleSendTest = () => {
+    if (!emailAddress || !emailAddress.includes('@')) {
+      alert("Please enter a valid email address first.");
+      return;
+    }
+    setIsSendingTest(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsSendingTest(false);
+      setTestSent(true);
+      setTimeout(() => setTestSent(false), 3000);
+    }, 1500);
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-24">
+      {/* Identity Section */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <div className="flex items-center gap-2">
+          <User className="text-indigo-600 w-5 h-5" />
+          <h2 className="text-xl font-black text-gray-900 tracking-tight">Delivery Identity</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input 
+              type="email" 
+              value={emailAddress}
+              onChange={(e) => setEmailAddress(e.target.value)}
+              placeholder="your@email.com"
+              className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800 transition-all" 
+            />
+          </div>
+          {!emailAddress.includes('@') && emailAddress.length > 0 && (
+            <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" /> Please enter a valid email
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Configuration Section */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-              <Bell className="text-indigo-600 w-6 h-6" />
-              Proactive Styling
-            </h2>
-            <p className="text-sm text-gray-500 font-medium">
-              Don't wait to check the weather. Aura sends your outfit brief directly to you.
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+            <Bell className="text-indigo-600 w-6 h-6" />
+            Proactive Styling
+          </h2>
+          <p className="text-sm text-gray-500 font-medium">
+            Don't wait to check the weather. Aura sends your outfit brief directly to you.
+          </p>
         </div>
 
         <div className="space-y-4 pt-4 border-t border-gray-50">
@@ -199,7 +239,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
       {/* Preview Modal Overlay */}
       {isPreviewing && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 relative flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 relative flex flex-col max-h-[85vh]">
             <button 
               onClick={() => setIsPreviewing(false)}
               className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
@@ -207,17 +247,17 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
               <X className="w-5 h-5 text-gray-500" />
             </button>
 
-            <div className="p-8 pb-4 border-b border-gray-50 flex items-center gap-4">
+            <div className="p-8 pb-4 border-b border-gray-50 flex items-center gap-4 flex-shrink-0">
               <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
                 <Send className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-xl font-black text-gray-900 tracking-tight">Your Style Briefing</h3>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Scheduled for {sendTime}</p>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Target: {emailAddress || 'Not set'}</p>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gray-50/30">
               {isGenerating ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <div className="relative">
@@ -225,24 +265,31 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                     <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-600 w-6 h-6" />
                   </div>
                   <p className="text-gray-900 font-black tracking-tight">Stylist is drafting...</p>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-[0.2em]">Crafting editorial content</p>
                 </div>
               ) : (
-                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 font-medium text-gray-800 leading-relaxed whitespace-pre-wrap italic">
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 font-medium text-gray-800 leading-relaxed whitespace-pre-wrap italic shadow-sm">
                   {digestContent}
                 </div>
               )}
             </div>
 
-            <div className="p-8 pt-4 bg-gray-50 flex flex-col gap-3">
+            <div className="p-8 pt-6 bg-white border-t border-gray-100 flex-shrink-0 flex flex-col gap-3">
               <button 
-                disabled={isGenerating}
-                className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                onClick={handleSendTest}
+                disabled={isGenerating || isSendingTest || testSent}
+                className={`w-full py-4 rounded-2xl font-black shadow-xl transition-all flex items-center justify-center gap-2 ${
+                  testSent 
+                    ? 'bg-green-500 text-white shadow-green-100' 
+                    : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700 disabled:bg-gray-200 disabled:shadow-none'
+                }`}
               >
-                <Send className="w-5 h-5" />
-                Send Test Email Now
+                {isSendingTest ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                 testSent ? <CheckCircle2 className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+                {testSent ? "Test Briefing Sent!" : "Send Test Email Now"}
               </button>
-              <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest">Powered by Gemini 3 Flash</p>
+              <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest">
+                {emailAddress ? `Sends to ${emailAddress}` : "No destination email set"}
+              </p>
             </div>
           </div>
         </div>
@@ -253,7 +300,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
         <div>
           <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Status: Active</p>
           <p className="text-xs text-green-800 font-medium leading-relaxed">
-            Aura is currently in PWA mode. To receive background push notifications on Android/iOS, ensure "Add to Home Screen" is enabled in your browser menu.
+            Aura is currently in PWA mode. Settings are stored locally on this device.
           </p>
         </div>
       </div>
