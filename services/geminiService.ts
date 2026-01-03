@@ -2,12 +2,10 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { WeatherData, OutfitSuggestion, TempUnit } from "../types";
 
-const API_KEY = process.env.API_KEY || '';
-
 const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
 
 export const getOutfitSuggestion = async (weather: WeatherData, context: string = "casual", unit: TempUnit = 'F'): Promise<OutfitSuggestion> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const displayTemp = convertTemp(weather.temp, unit);
   
   const prompt = `
@@ -52,7 +50,7 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
  * Generates a professional email digest summarizing the weather and outfit.
  */
 export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F'): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const displayTemp = convertTemp(weather.temp, unit);
   
   const prompt = `
@@ -82,13 +80,15 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
 };
 
 export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F'): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const displayTemp = convertTemp(weather.temp, unit);
   const prompt = `A high-fashion editorial photo of a person wearing: ${outfit.baseLayer}, ${outfit.outerwear}, and ${outfit.footwear}. The background reflects ${weather.location} with ${displayTemp}°${unit} weather. Cinematic lighting, photorealistic.`;
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
-    contents: [{ text: prompt }],
+    contents: {
+      parts: [{ text: prompt }]
+    },
     config: {
       imageConfig: {
         aspectRatio: "3:4",
@@ -97,19 +97,23 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
     }
   });
 
+  if (!response.candidates?.[0]?.content?.parts) {
+    throw new Error("No image generated - response parts missing.");
+  }
+
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("No image generated");
+  throw new Error("No image data found in response parts.");
 };
 
 /**
  * Generates an atmospheric hero image of the weather conditions using 'gemini-2.5-flash-image' (nano banana).
  */
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const displayTemp = convertTemp(weather.temp, unit);
   
   const prompt = `A cinematic landscape photograph of ${weather.location} showing the actual atmospheric weather conditions: ${displayTemp}°${unit}, ${weather.precip}mm rain/snow, and ${weather.wind}km/h wind. Focus on the sky, lighting, and mood. Photorealistic, wide-angle.`;
@@ -126,16 +130,20 @@ export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempU
     }
   });
 
+  if (!response.candidates?.[0]?.content?.parts) {
+    throw new Error("No weather hero generated - response parts missing.");
+  }
+
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
       return `data:image/png;base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("No weather hero generated");
+  throw new Error("No weather hero image data found.");
 };
 
 export const getStoreLocations = async (location: string, outfitItem: string, lat: number, lon: number) => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: `Find high-quality clothing stores near ${location} (Lat: ${lat}, Lon: ${lon}) where I can buy ${outfitItem}.`,
