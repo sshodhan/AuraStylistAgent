@@ -1,33 +1,35 @@
-# Aura AI Guardrails: Fashion Safety & Quality (v2.2)
+# Aura AI Guardrails: Fashion Safety & Quality (v2.3)
 
-This documentation describes the logic used to prevent rendering errors (e.g., missing pants/trousers) in the Aura Styling Agent.
+This document outlines the multi-layer guardrail system used to maintain garment integrity and anatomical correctness in AI-generated fashion content.
 
-## 1. Multi-Stage Guardrail Logic
+## 1. The "No Hallucination" Guardrail
+The primary goal of version 2.3 is to eliminate "missing garment" errors where a subject might appear without trousers/shorts due to long outerwear (e.g., overcoats).
 
 ### A. Semantic Layer (Reasoning)
-The `gemini-3-flash-preview` model acts as the primary gatekeeper.
-- **Constraint**: The `OutfitSuggestion` schema now includes a mandatory `lowerBody` field.
-- **System Instruction**: Explicitly forbids suggestions that do not include a lower-body garment.
-- **Outcome**: The agent cannot produce a styling verdict that is "incomplete" at the text level.
+The `OutfitSuggestion` schema enforces a mandatory `lowerBody` field.
+- **Rule**: If the AI suggests an overcoat, it *must* also suggest a matching lower-body garment.
+- **Threshold**: Shorts are conditionally enabled only if `weather.temp > 20°C` or the `styleContext` is "athletic".
+- **Result**: The reasoning engine never produces an "incomplete" outfit metadata object.
 
-### B. Visual Layer (Prompt Engineering)
-The `gemini-3-pro-image-preview` model receives reinforced instructions.
-- **Layered Visibility**: The prompt forces the engine to render garments in a specific order: `[Outerwear] -> [Base Layer] -> [Lower Body] -> [Footwear]`.
-- **Modesty Anchor**: Includes negative constraints like "no bare legs" and "no missing garments."
-- **Full-Body Context**: Explicitly requests a "Full-length shot" to ensure the frame includes the waist-to-ankle area even when long coats are suggested.
+### B. Visual Layer (Image Synthesis)
+The `gemini-3-pro-image-preview` prompt is structured to treat the `lowerBody` field as a mandatory visual anchor.
+- **Prompt Logic**: "Render the [lowerBody] garment clearly below the [outerwear]. Ensure full-body visibility from head to toe."
+- **Portrait Anchor**: Forcing a 3:4 or 9:16 aspect ratio ensures the camera doesn't crop the legs, verifying the presence of the garment.
 
-### C. Motion Layer (Temporal Consistency)
-The `veo-3.1-generate-preview` model inherits these constraints.
-- **Anchor Frame Guardrails**: By using the "Fit Check" images as start/end seeds, the video generation is tethered to the validated garments.
-- **Frame Interpolation**: The motion engine is prompted to verify "anatomical layering" during synthesis to prevent fabric "ghosting" or disappearing trousers during movement.
+### C. Motion Layer (Veo Synthesis)
+The Motion Engine uses the generated previews as start/end keys.
+- **Interpolation**: By providing two images where the lower body is clearly defined, the Veo engine maintains garment consistency throughout the 9:16 runway animation.
 
-## 2. Technical Implementation Details
-- **File**: `services/geminiService.ts`
-- **Functions**: `getOutfitSuggestion`, `generateOutfitImage`, `generateVeoVideo`.
-- **Change Log (v2.2)**: 
-  - Added `lowerBody` to JSON schema.
-  - Refined `generateOutfitImage` prompt to emphasize visibility of all layers.
-  - Added "Quality Reassurance" messages in the UI during synthesis.
+## 2. Technical Data Model
+```typescript
+interface OutfitSuggestion {
+  baseLayer: string;   // Inner tops/knits
+  outerwear: string;   // Coats/Jackets
+  lowerBody: string;   // Trousers/Pants/Shorts/Skirt (MANDATORY)
+  footwear: string;    // Shoes/Boots
+  // ... metadata fields
+}
+```
 
 ---
 *Aura Safety & Quality Team | March 2025*

@@ -3,26 +3,30 @@
 Aura is a high-end AI styling concierge that bridges real-time atmospheric data with generative visual synthesis.
 
 ## 1. Technical Architecture Overview
-- **Reasoning**: `gemini-3-flash-preview`
-- **Vision (Fit Check)**: `gemini-3-pro-image-preview`
-- **Motion (Runway)**: `veo-3.1-generate-preview` (See [AURA_MOTION_GUIDE.md](./AURA_MOTION_GUIDE.md) for portrait video specs)
-- **Grounding**: `gemini-2.5-flash` with `googleMaps`
-- **Voice**: `gemini-2.5-flash-native-audio-preview-09-2025`
+- **Reasoning Engine**: `gemini-3-flash-preview` (Processes weather data into structured JSON)
+- **Vision (Fit Check)**: `gemini-3-pro-image-preview` (Generates 1K-4K high-fashion previews)
+- **Motion (Runway)**: `veo-3.1-generate-preview` (Produces 9:16 vertical video)
+- **Grounding**: `gemini-2.5-flash` with `googleMaps` tool
+- **Voice**: `gemini-2.5-flash-native-audio-preview-09-2025` (Low-latency interaction)
 - **Email Backend**: Vercel Serverless Functions + Resend API.
 
-## 2. Pre-deployment Checklist
-1. **Google AI Studio Key**: From [ai.google.dev](https://ai.google.dev/). 
-   - *Note: Video and High-fidelity images require a Paid GCP Project.*
-2. **Resend API Key**: From [resend.com](https://resend.com/overview).
-3. **Vercel Account**: For hosting the frontend and serverless API.
+## 2. Style Safety Guardrails (v2.3)
+To prevent visual hallucinations (e.g., missing lower-body garments), Aura implements strict schema and prompt guardrails:
+- **Mandatory Field**: The `OutfitSuggestion` JSON schema requires a `lowerBody` garment.
+- **Shorts Threshold**: The system logic allows shorts/mini-skirts only when the environment temperature is >20°C (68°F) or for specific athletic archetypes.
+- **Rendering Anchor**: The Image and Video engines are instructed to use the `lowerBody` field as the primary visual anchor for the bottom half of the frame.
+- See [AURA_GUARDRAILS.md](./AURA_GUARDRAILS.md) for full implementation details.
 
-## 3. Configuration
-Add these in Vercel Settings:
-- `API_KEY`: Your Gemini API Key.
-- `RESEND_API_KEY`: Your Resend API Key.
+## 3. Configuration & Deployment
+Add these environment variables in your Vercel Project Settings:
+- `API_KEY`: Your Google Gemini API Key.
+- `RESEND_API_KEY`: Your Resend API Key for email automation.
 
 ## 4. Permissions
-- **Camera/Microphone/Geolocation**: Essential for the "Mirror", "Voice", and "Local Finds" features.
+Aura requires the following browser permissions to function as intended:
+- **Geolocation**: For precise local weather and grounding.
+- **Microphone**: For the Aura Voice Consultation tab.
+- **Camera**: For the Virtual Mirror / Fit Check upload features.
 
 ---
-*Aura Engineering Team | 2025*
+*Aura Engineering Team | March 2025*

@@ -35,8 +35,8 @@ export const generateVeoVideo = async (
     const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
 
     let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-generate-preview',
-      prompt: `${prompt}. Full-body coverage is mandatory. Ensure trousers and shoes are clearly visible. No missing lower-body garments.`,
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: `${prompt}. Ensure the lower body is clearly rendered with the specified ${imageUrls.length > 0 ? 'garments' : 'clothing'}. If shorts are worn, they must be distinct and intentional.`,
       image: {
         imageBytes: startImage,
         mimeType: 'image/png',
@@ -90,12 +90,14 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   
   const prompt = `
     Role: ${getUserRole()}
-    Task: Suggest a complete, modest, high-fashion outfit for ${weather.location} at ${displayTemp}°${unit}.
+    Task: Suggest a complete, high-fashion outfit for ${weather.location} at ${displayTemp}°${unit}.
     
-    SAFETY MANDATE:
-    - You MUST provide a specific "lowerBody" garment (e.g., tailored trousers, chinos, denim, or long skirt). 
-    - Bare legs are strictly prohibited for this style archetype.
-    - Ensure the outfit is logically layered for the weather.
+    SAFETY & LOGIC MANDATE:
+    - You MUST provide a specific "lowerBody" garment. 
+    - Choices: Trousers, Chinos, Denim, Skirt, or Shorts.
+    - SHORTS POLICY: Only suggest shorts if the temperature is above 20°C (68°F) or for specific athletic/relaxed contexts. 
+    - In rain or professional settings with long coats, prefer trousers to maintain aesthetic balance.
+    - Ensure the outfit is logically layered. No "naked" or missing lower-body glitches.
 
     Style DNA: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
   `;
@@ -111,7 +113,7 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
           properties: {
             baseLayer: { type: Type.STRING, description: "Tops/Shirts" },
             outerwear: { type: Type.STRING, description: "Coats/Jackets" },
-            lowerBody: { type: Type.STRING, description: "Trousers/Pants/Skirt - MANDATORY" },
+            lowerBody: { type: Type.STRING, description: "Trousers/Pants/Shorts/Skirt - MANDATORY" },
             footwear: { type: Type.STRING },
             proTip: { type: Type.STRING },
             styleReasoning: { type: Type.STRING },
@@ -143,19 +145,18 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const profile = getUserProfile();
   
-  // GUARDRAIL: Forcing the model to explicitly render all garment layers to prevent missing pants under long coats.
   const prompt = `
-    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH SHOT.
+    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH HEAD-TO-TOE SHOT.
     SUBJECT: ${userImage ? 'the person in the reference' : subject}.
     THEME: ${visualVariation || profile.styleArchetype}.
     PALETTE: ${paletteHint || profile.preferredPalette.join(', ')}.
-    MANDATORY GARMENTS: 
+    MANDATORY GARMENTS (Must be clearly visible): 
     1. ${outfit.outerwear} (Outer Layer)
     2. ${outfit.baseLayer} (Inner Layer)
-    3. ${outfit.lowerBody} (Mandatory - must be visible below coat)
+    3. ${outfit.lowerBody} (Primary Lower Body - MUST RENDER CLEARLY)
     4. ${outfit.footwear}
     
-    SAFETY & QUALITY: Fully clothed, anatomically correct, high-fashion modesty. No bare legs.
+    QUALITY CONTROL: Ensure the ${outfit.lowerBody} is physically present. If shorts, show intentional leg styling. No bare-body hallucinations.
     ATMOSPHERE: ${weather.location} street scene, ${weather.precip > 0 ? 'drizzly' : 'crisp'}.
   `.trim();
   
@@ -203,7 +204,7 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
     contents: {
       parts: [
         { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: 'image/jpeg' } },
-        { text: `${prompt}. Maintain full-body garment integrity.` },
+        { text: `${prompt}. Ensure garment integrity.` },
       ],
     },
     config: { imageConfig: { aspectRatio: "3:4" } }

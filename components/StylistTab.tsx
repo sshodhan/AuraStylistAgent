@@ -370,6 +370,7 @@ const StylistTab: React.FC<Props> = ({
             <div className="grid grid-cols-1 gap-4">
               <VerdictItem icon={<Shirt className="w-5 h-5" />} label="Outerwear" value={currentOutfit.outerwear} accent="indigo" />
               <VerdictItem icon={<Zap className="w-5 h-5" />} label="Base Layer" value={currentOutfit.baseLayer} accent="indigo" />
+              {/* THE GUARDRAIL UI: Displaying the mandatory lowerBody garment */}
               <VerdictItem icon={<Layers className="w-5 h-5" />} label="Lower Body" value={currentOutfit.lowerBody} accent="indigo" />
               <VerdictItem icon={<Footprints className="w-5 h-5" />} label="Footwear" value={currentOutfit.footwear} accent="indigo" />
             </div>

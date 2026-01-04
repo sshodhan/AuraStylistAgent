@@ -21,7 +21,7 @@ export interface WeatherData {
 export interface OutfitSuggestion {
   baseLayer: string;
   outerwear: string;
-  lowerBody: string; // Added field for mandatory trousers/pants rendering
+  lowerBody: string; // NEW: Mandatory field to prevent "no pants" rendering errors
   footwear: string;
   proTip: string;
   styleReasoning: string;
