@@ -378,7 +378,6 @@ const StylistTab: React.FC<Props> = ({
                 {activePersona.name} • {getDisplayTemp(weather.temp)}°{unit}
               </p>
             </div>
-            {/* Action button relabeled to "Fit Check" with text as per screenshot request */}
             <button 
               onClick={() => onFitCheck?.() || onTabChange(AppTab.VISUALIZE)} 
               className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-lg active:scale-95 group transition-all"
@@ -405,20 +404,7 @@ const StylistTab: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* The Context Block */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="h-[1px] flex-1 bg-gray-100" />
-                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.3em]">The Plan</span>
-                <div className="h-[1px] flex-1 bg-gray-100" />
-              </div>
-
-              <div className="space-y-6">
-                <VerdictItem icon={<Compass className="w-5 h-5" />} label="Activity" value={currentOutfit.activity} accent="emerald" />
-                <VerdictItem icon={<Coffee className="w-5 h-5" />} label="Vibe Stop" value={currentOutfit.coffeeSpot} accent="amber" />
-                <VerdictItem icon={<Store className="w-5 h-5" />} label="Nearby Hunting" value={currentOutfit.storeType} accent="rose" onAction={() => onTabChange(AppTab.STORES)} />
-              </div>
-            </div>
+            {/* Note: "The Plan" block was removed here and moved to the 'Plan' tab */}
 
             {/* Stylist Reasoning - Fully Visible */}
             <div className="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
@@ -432,6 +418,15 @@ const StylistTab: React.FC<Props> = ({
                 <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Pro Tip: {currentOutfit.proTip}</p>
               </div>
             </div>
+
+            {/* Call to action for the Plan tab */}
+            <button 
+              onClick={() => onTabChange(AppTab.PLAN)}
+              className="w-full py-5 bg-indigo-50 border border-indigo-100 rounded-[2rem] flex items-center justify-center gap-3 active:scale-95 transition-all group"
+            >
+              <Compass className="w-4 h-4 text-indigo-600 group-hover:rotate-45 transition-transform" />
+              <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Explore Your Plan for Today</span>
+            </button>
           </div>
         </div>
       )}

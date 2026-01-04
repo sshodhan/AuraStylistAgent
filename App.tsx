@@ -4,9 +4,9 @@ import { AppTab, WeatherData, OutfitSuggestion, TempUnit } from './types';
 import StylistTab from './components/StylistTab';
 import VoiceTab from './components/VoiceTab';
 import VisualizeTab from './components/VisualizeTab';
-import StoresTab from './components/StoresTab';
+import PlanTab from './components/PlanTab';
 import SettingsTab from './components/SettingsTab';
-import { Cloud, Mic, Sparkles, MapPin, Shirt, Settings } from 'lucide-react';
+import { Cloud, Mic, Sparkles, Compass, Shirt, Settings } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.STYLIST);
@@ -53,7 +53,7 @@ const App: React.FC = () => {
     { id: AppTab.STYLIST, label: 'Stylist', icon: Shirt },
     { id: AppTab.VOICE, label: 'Voice', icon: Mic },
     { id: AppTab.VISUALIZE, label: 'Visualize', icon: Sparkles },
-    { id: AppTab.STORES, label: 'Stores', icon: MapPin },
+    { id: AppTab.PLAN, label: 'Plan', icon: Compass },
     { id: AppTab.SETTINGS, label: 'Daily', icon: Settings },
   ];
 
@@ -63,16 +63,14 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full max-w-md mx-auto flex flex-col bg-white overflow-hidden relative selection:bg-indigo-100">
-      {/* Fixed App Header - Centered Content based on Screenshot */}
+      {/* Fixed App Header */}
       <header className="px-5 py-4 relative flex justify-between items-center bg-white z-30 shrink-0 border-b border-gray-100">
-        {/* Left Section: Icon Only */}
         <div className="flex items-center z-10">
           <div className="bg-indigo-600 p-2 rounded-xl shadow-md shadow-indigo-100">
             <Cloud className="text-white w-4 h-4" />
           </div>
         </div>
 
-        {/* Center Section: Location & Welcome (Matching Screenshot Style) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           {weather ? (
             <div className="flex flex-col items-center animate-in fade-in slide-in-from-top-1 duration-500">
@@ -88,7 +86,6 @@ const App: React.FC = () => {
           )}
         </div>
         
-        {/* Right Section: Units & Temp (Matching Screenshot layout) */}
         <div className="flex items-center gap-2 z-10">
           <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-100">
             {(['C', 'F'] as TempUnit[]).map((u) => (
@@ -146,7 +143,7 @@ const App: React.FC = () => {
                 autoTrigger={visualizeTriggered}
               />
             )}
-            {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
+            {activeTab === AppTab.PLAN && <PlanTab weather={weather} outfit={outfit} onTabChange={handleTabChange} />}
             {activeTab === AppTab.SETTINGS && <SettingsTab weather={weather} outfit={outfit} unit={unit} />}
           </div>
         </div>

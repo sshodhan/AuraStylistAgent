@@ -25,7 +25,7 @@ export enum AppTab {
   STYLIST = 'stylist',
   VOICE = 'voice',
   VISUALIZE = 'visualize',
-  STORES = 'stores',
+  PLAN = 'plan',
   SETTINGS = 'settings'
 }
 
@@ -33,4 +33,5 @@ export interface GroundingLink {
   uri: string;
   title: string;
   coords?: { lat: number; lon: number };
+  type?: 'eat' | 'explore' | 'shop';
 }
