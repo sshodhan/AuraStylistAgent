@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { WeatherData, OutfitSuggestion, TempUnit, AppTab } from '../types';
 import { fetchWeather, geocode } from '../services/weatherService';
 import { getOutfitSuggestion, generateWeatherHeroImage } from '../services/geminiService';
@@ -33,18 +34,21 @@ interface StylePersona {
   name: string;
   label: string;
   icon: React.ElementType;
+  emoji: string;
+  color: string;
+  bgColor: string;
 }
 
 const STYLE_PERSONAS: StylePersona[] = [
-  { id: 'casual', name: 'Effortless', label: 'Minimalist', icon: Shirt },
-  { id: 'formal office', name: 'Powerful', label: 'Executive', icon: Briefcase },
-  { id: 'relaxed home', name: 'Snug', label: 'Cozy', icon: Coffee },
-  { id: 'night out', name: 'Chic', label: 'Socialite', icon: Moon },
-  { id: 'creative artsy', name: 'Artistic', label: 'Eclectic', icon: Palette },
-  { id: 'casual hike', name: 'Rugged', label: 'Explorer', icon: Footprints },
-  { id: 'academic studious', name: 'Studious', label: 'Sharp', icon: BookOpen },
-  { id: 'athletic', name: 'Active', label: 'Dynamic', icon: Zap },
-  { id: 'vibrant party', name: 'Festive', label: 'Energetic', icon: PartyPopper },
+  { id: 'casual', name: 'Effortless', label: 'Minimalist', icon: Shirt, emoji: '👕', color: 'from-blue-500 to-indigo-500', bgColor: 'bg-blue-50' },
+  { id: 'formal office', name: 'Powerful', label: 'Executive', icon: Briefcase, emoji: '💼', color: 'from-slate-700 to-slate-900', bgColor: 'bg-slate-100' },
+  { id: 'relaxed home', name: 'Snug', label: 'Cozy', icon: Coffee, emoji: '☕', color: 'from-orange-400 to-amber-600', bgColor: 'bg-orange-50' },
+  { id: 'night out', name: 'Chic', label: 'Socialite', icon: Moon, emoji: '🌙', color: 'from-indigo-600 to-purple-600', bgColor: 'bg-indigo-50' },
+  { id: 'creative artsy', name: 'Artistic', label: 'Eclectic', icon: Palette, emoji: '🎨', color: 'from-pink-500 to-rose-400', bgColor: 'bg-rose-50' },
+  { id: 'casual hike', name: 'Rugged', label: 'Explorer', icon: Footprints, emoji: '🥾', color: 'from-emerald-500 to-teal-400', bgColor: 'bg-emerald-50' },
+  { id: 'academic studious', name: 'Studious', label: 'Sharp', icon: BookOpen, emoji: '📚', color: 'from-amber-700 to-yellow-800', bgColor: 'bg-stone-100' },
+  { id: 'athletic', name: 'Active', label: 'Dynamic', icon: Zap, emoji: '⚡', color: 'from-yellow-400 to-orange-500', bgColor: 'bg-yellow-50' },
+  { id: 'vibrant party', name: 'Festive', label: 'Energetic', icon: PartyPopper, emoji: '🥳', color: 'from-fuchsia-500 to-purple-500', bgColor: 'bg-fuchsia-50' },
 ];
 
 interface Props {
@@ -84,6 +88,7 @@ const StylistTab: React.FC<Props> = ({
   const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
   const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
   const [context, setContext] = useState('casual');
+  const [hoveredPersona, setHoveredPersona] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLocationExpanded, setIsLocationExpanded] = useState(false);
@@ -245,46 +250,98 @@ const StylistTab: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Optimized Compact Tactile Mood Carousel */}
-      <div className="space-y-1.5 relative overflow-hidden">
-        <h3 className="px-5 text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none">Persona</h3>
+      {/* Enhanced Compact Tactile Mood Carousel */}
+      <div className="space-y-4 pt-4 relative overflow-hidden">
+        <h3 className="px-5 text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none">Style Persona</h3>
+        
+        {/* Gradient overlays for scroll indication */}
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white/80 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent z-10 pointer-events-none" />
+        
         <div 
           ref={carouselRef}
           className="flex gap-3 overflow-x-auto py-2 scrollbar-hide snap-x snap-proximity overscroll-x-contain touch-pan-x select-none px-[calc(50%-40px)]"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {STYLE_PERSONAS.map((persona) => {
+          {STYLE_PERSONAS.map((persona, index) => {
             const Icon = persona.icon;
             const isActive = context === persona.id;
+            const isHovered = hoveredPersona === persona.id;
+
             return (
-              <button
+              <motion.div
                 key={persona.id}
-                onClick={() => setContext(persona.id)}
-                className={`flex-shrink-0 w-20 h-20 rounded-3xl border-2 snap-center flex flex-col items-center justify-center relative outline-none transition-all duration-300 transform-gpu ${
-                  isActive 
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-105 z-10' 
-                    : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-100 active:scale-90 active:duration-100'
-                }`}
-                style={{ 
-                  transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' 
-                }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="flex-shrink-0 snap-center relative"
               >
-                <div className={`p-1.5 rounded-xl mb-1 transition-colors duration-300 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-                </div>
-                <div className="text-center flex flex-col px-1 leading-none">
-                  <span className={`text-[8px] font-black uppercase tracking-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-900'}`}>
-                    {persona.name}
-                  </span>
-                </div>
-                {isActive && (
-                   <div className="absolute -top-1 -right-1 animate-in zoom-in duration-300">
-                     <div className="bg-white rounded-full p-0.5 shadow-md border border-indigo-100">
-                       <Check className="w-2 h-2 text-indigo-600 stroke-[5px]" />
+                <button
+                  onClick={() => setContext(persona.id)}
+                  onMouseEnter={() => setHoveredPersona(persona.id)}
+                  onMouseLeave={() => setHoveredPersona(null)}
+                  className={`relative w-20 h-20 rounded-3xl border-2 flex flex-col items-center justify-center outline-none transition-all duration-300 transform-gpu ${
+                    isActive 
+                      ? `bg-gradient-to-br ${persona.color} border-transparent text-white shadow-xl shadow-indigo-100 scale-105 z-10` 
+                      : `${persona.bgColor} border-gray-100 text-gray-400 hover:border-indigo-100 active:scale-90 active:duration-100`
+                  }`}
+                  style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                >
+                  {/* Emoji bubble that appears on hover or selection */}
+                  <AnimatePresence>
+                    {(isHovered || isActive) && (
+                      <motion.div
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+                        initial={{ opacity: 0, scale: 0, y: 5 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0, y: 5 }}
+                        transition={{ type: "spring", bounce: 0.5 }}
+                      >
+                        <div className="text-sm bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg border border-gray-50">
+                          {persona.emoji}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Icon */}
+                  <div className={`p-1.5 rounded-xl mb-1 transition-colors duration-300 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                  </div>
+
+                  {/* Name */}
+                  <div className="text-center flex flex-col px-1 leading-none">
+                    <span className={`text-[8px] font-black uppercase tracking-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                      {persona.name}
+                    </span>
+                  </div>
+
+                  {/* Selection Checkmark */}
+                  {isActive && (
+                     <div className="absolute -top-1 -right-1 animate-in zoom-in duration-300">
+                       <div className="bg-white rounded-full p-0.5 shadow-md border border-indigo-100">
+                         <Check className="w-2 h-2 text-indigo-600 stroke-[5px]" />
+                       </div>
                      </div>
-                   </div>
-                )}
-              </button>
+                  )}
+
+                  {/* Sparkle effects on selected */}
+                  {isActive && (
+                    <>
+                      <motion.div
+                        className="absolute top-2 right-2 w-1 h-1 bg-white rounded-full"
+                        animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                      <motion.div
+                        className="absolute bottom-2 left-2 w-0.5 h-0.5 bg-white rounded-full"
+                        animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                      />
+                    </>
+                  )}
+                </button>
+              </motion.div>
             );
           })}
         </div>
