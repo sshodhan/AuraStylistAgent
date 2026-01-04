@@ -13,7 +13,7 @@ const App: React.FC = () => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [outfit, setOutfit] = useState<OutfitSuggestion | null>(null);
   const [weatherHero, setWeatherHero] = useState<string | null>(null);
-  const [outfitImage, setOutfitImage] = useState<string | null>(null);
+  const [outfitImages, setOutfitImages] = useState<string[] | null>(null);
   const [unit, setUnit] = useState<TempUnit>('F');
 
   const tabs = [
@@ -72,16 +72,26 @@ const App: React.FC = () => {
                 unit={unit}
                 weather={weather}
                 weatherHero={weatherHero}
-                outfitImage={outfitImage}
+                outfitImage={outfitImages?.[0] || null}
                 onWeatherUpdate={setWeather} 
                 onOutfitUpdate={setOutfit} 
                 onHeroUpdate={setWeatherHero}
-                onOutfitImageUpdate={setOutfitImage}
+                onOutfitImageUpdate={(img) => setOutfitImages(img ? [img] : null)}
                 currentOutfit={outfit} 
+                onTabChange={setActiveTab}
               />
             )}
             {activeTab === AppTab.VOICE && <VoiceTab weather={weather} unit={unit} />}
-            {activeTab === AppTab.VISUALIZE && <VisualizeTab outfit={outfit} weather={weather} unit={unit} />}
+            {activeTab === AppTab.VISUALIZE && (
+              <VisualizeTab 
+                outfit={outfit} 
+                weather={weather} 
+                unit={unit} 
+                imageUrls={outfitImages} 
+                onImagesUpdate={setOutfitImages}
+                onTabChange={setActiveTab}
+              />
+            )}
             {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
             {activeTab === AppTab.SETTINGS && <SettingsTab weather={weather} outfit={outfit} unit={unit} />}
           </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
+import { WeatherData, OutfitSuggestion, TempUnit, AppTab } from '../types';
 import { fetchWeather, geocode } from '../services/weatherService';
 import { getOutfitSuggestion, generateOutfitImage, generateWeatherHeroImage } from '../services/geminiService';
 import { 
@@ -19,7 +19,11 @@ import {
   Footprints,
   Moon,
   Zap,
-  Check
+  Check,
+  Coffee,
+  Palette,
+  BookOpen,
+  PartyPopper
 } from 'lucide-react';
 
 interface StylePersona {
@@ -30,11 +34,15 @@ interface StylePersona {
 }
 
 const STYLE_PERSONAS: StylePersona[] = [
-  { id: 'casual', name: 'Minimalist', label: 'Effortless', icon: Shirt },
-  { id: 'formal office', name: 'Executive', label: 'Powerful', icon: Briefcase },
-  { id: 'casual hike', name: 'Explorer', label: 'Rugged', icon: Footprints },
-  { id: 'night out', name: 'Socialite', label: 'Chic', icon: Moon },
-  { id: 'athletic', name: 'Athlete', label: 'Active', icon: Zap },
+  { id: 'casual', name: 'Effortless', label: 'Minimalist', icon: Shirt },
+  { id: 'formal office', name: 'Powerful', label: 'Executive', icon: Briefcase },
+  { id: 'relaxed home', name: 'Snug', label: 'Cozy', icon: Coffee },
+  { id: 'night out', name: 'Chic', label: 'Socialite', icon: Moon },
+  { id: 'creative artsy', name: 'Artistic', label: 'Eclectic', icon: Palette },
+  { id: 'casual hike', name: 'Rugged', label: 'Explorer', icon: Footprints },
+  { id: 'academic studious', name: 'Studious', label: 'Sharp', icon: BookOpen },
+  { id: 'athletic', name: 'Active', label: 'Dynamic', icon: Zap },
+  { id: 'vibrant party', name: 'Festive', label: 'Energetic', icon: PartyPopper },
 ];
 
 interface Props {
@@ -47,6 +55,7 @@ interface Props {
   onHeroUpdate: (h: string | null) => void;
   onOutfitImageUpdate: (img: string | null) => void;
   currentOutfit: OutfitSuggestion | null;
+  onTabChange: (tab: AppTab) => void;
 }
 
 const StylistTab: React.FC<Props> = ({ 
@@ -58,12 +67,12 @@ const StylistTab: React.FC<Props> = ({
   onOutfitUpdate, 
   onHeroUpdate,
   onOutfitImageUpdate,
-  currentOutfit 
+  currentOutfit,
+  onTabChange
 }) => {
   const [locationInput, setLocationInput] = useState('Seattle');
   const [context, setContext] = useState('casual');
   const [loading, setLoading] = useState(false);
-  const [visualizing, setVisualizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async (e?: React.FormEvent) => {
@@ -114,18 +123,8 @@ const StylistTab: React.FC<Props> = ({
     }
   }, [context]);
 
-  const handleVisualize = async () => {
-    if (!currentOutfit || !weather) return;
-    setVisualizing(true);
-    setError(null);
-    try {
-      const url = await generateOutfitImage(currentOutfit, weather, "1K", unit);
-      onOutfitImageUpdate(url);
-    } catch (err: any) {
-      setError("Failed to render image.");
-    } finally {
-      setVisualizing(false);
-    }
+  const handleVisualizeNavigation = () => {
+    onTabChange(AppTab.VISUALIZE);
   };
 
   useEffect(() => {
@@ -183,9 +182,9 @@ const StylistTab: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Style Persona Carousel */}
+      {/* Style Mood Carousel */}
       <div className="space-y-2">
-        <h3 className="px-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">Select Your Persona</h3>
+        <h3 className="px-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">What is your mood today?</h3>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x px-1">
           {STYLE_PERSONAS.map((persona) => {
             const Icon = persona.icon;
@@ -203,7 +202,7 @@ const StylistTab: React.FC<Props> = ({
                 <div className={`p-1 rounded-lg mb-0.5 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
                   <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
                 </div>
-                <div className="text-center flex flex-col">
+                <div className="text-center flex flex-col px-1">
                   <span className={`text-[8px] font-black uppercase tracking-tight leading-tight ${isActive ? 'text-white' : 'text-gray-900'}`}>{persona.name}</span>
                   <span className={`text-[6px] font-bold uppercase tracking-widest opacity-60 mt-0.5 leading-none ${isActive ? 'text-indigo-100' : 'text-gray-400'}`}>{persona.label}</span>
                 </div>
@@ -268,12 +267,12 @@ const StylistTab: React.FC<Props> = ({
             </div>
 
             <button
-              onClick={handleVisualize}
-              disabled={visualizing || loading}
+              onClick={handleVisualizeNavigation}
+              disabled={loading}
               className="w-full py-4 bg-gray-900 text-white rounded-xl font-black text-[9px] uppercase tracking-[0.3em] hover:bg-black transition-all flex items-center justify-center gap-2.5 active:scale-95 shadow-lg shadow-gray-100 disabled:bg-gray-400"
             >
-              {visualizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-              {outfitImage ? "Regenerate Render" : "Visualize Look"}
+              <Camera className="w-3.5 h-3.5" />
+              Visualize Look
             </button>
           </div>
 

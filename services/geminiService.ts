@@ -1,8 +1,10 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { WeatherData, OutfitSuggestion, TempUnit } from "../types";
 
 const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
 
+// Generates an outfit suggestion based on weather and context
 export const getOutfitSuggestion = async (weather: WeatherData, context: string = "casual", unit: TempUnit = 'F'): Promise<OutfitSuggestion> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
@@ -42,12 +44,10 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
     }
   });
 
-  return JSON.parse(response.text);
+  return JSON.parse(response.text || '{}');
 };
 
-/**
- * Generates a professional email digest summarizing the weather and outfit.
- */
+// Generates an email digest content
 export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F', userName: string = ''): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
@@ -79,10 +79,19 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
   return response.text || "Your daily style brief is ready.";
 };
 
-export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F'): Promise<string> => {
+// Fix: Added generateOutfitImage to resolve missing export error
+export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F', subject: string = "a stylish person"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
-  const prompt = `A high-fashion editorial photo of a person wearing: ${outfit.baseLayer}, ${outfit.outerwear}, and ${outfit.footwear}. The background reflects ${weather.location} with ${displayTemp}°${unit} weather. Cinematic lighting, photorealistic.`;
+  
+  const prompt = `High-fashion editorial photo of ${subject} in ${weather.location}. 
+  STYLING VERDICT TO FOLLOW EXACTLY:
+  - Base: ${outfit.baseLayer}
+  - Outerwear: ${outfit.outerwear}
+  - Shoes: ${outfit.footwear}
+  - Stylist Note: ${outfit.proTip}
+  
+  ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
@@ -98,7 +107,7 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
   });
 
   if (!response.candidates?.[0]?.content?.parts) {
-    throw new Error("No image generated - response parts missing.");
+    throw new Error("Generation failed for the variation.");
   }
 
   for (const part of response.candidates[0].content.parts) {
@@ -106,12 +115,22 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
       return `data:image/png;base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("No image data found in response parts.");
+  throw new Error("No image data found.");
 };
 
-/**
- * Generates an atmospheric hero image of the weather conditions using 'gemini-2.5-flash-image' (nano banana).
- */
+// Generates multiple variations for lookbook
+export const generateOutfitImages = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F'): Promise<string[]> => {
+  const subjects = [
+    "a stylish man",
+    "a stylish woman",
+    "two people together"
+  ];
+
+  // Run variations in parallel using the singular helper
+  return Promise.all(subjects.map(subject => generateOutfitImage(outfit, weather, size, unit, subject)));
+};
+
+// Generates a cinematic hero image of the current weather conditions
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
@@ -131,7 +150,7 @@ export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempU
   });
 
   if (!response.candidates?.[0]?.content?.parts) {
-    throw new Error("No weather hero generated - response parts missing.");
+    throw new Error("No weather hero generated.");
   }
 
   for (const part of response.candidates[0].content.parts) {
@@ -142,6 +161,7 @@ export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempU
   throw new Error("No weather hero image data found.");
 };
 
+// Retrieves local store locations using Google Maps grounding
 export const getStoreLocations = async (location: string, outfitItem: string, lat: number, lon: number) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
@@ -168,7 +188,7 @@ export const getStoreLocations = async (location: string, outfitItem: string, la
     })) || [];
 
   return {
-    text: response.text,
+    text: response.text || "",
     links
   };
 };
