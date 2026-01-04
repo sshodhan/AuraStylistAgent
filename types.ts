@@ -15,6 +15,10 @@ export interface OutfitSuggestion {
   footwear: string;
   proTip: string;
   styleReasoning: string;
+  // New Lifestyle Fields
+  activity: string;
+  coffeeSpot: string;
+  storeType: string;
 }
 
 export enum AppTab {
