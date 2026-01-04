@@ -16,9 +16,11 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
 
     Suggest:
     1. A 3-piece outfit (Base, Outerwear, Shoes).
-    2. A "Fun Activity" optimized for this weather and the "${context}" vibe.
-    3. A "Coffee/Dining Vibe" (e.g., "Fireplace Bistro" or "Iced Matcha Garden").
-    4. "Store Type" (Specific category like "Heritage Outfitter" or "Techwear Lab").
+    2. A "Weather Story": A very short (2 sentences max), inspirational narrative about today's atmosphere and an activity the user should feel inspired to do. 
+    3. "Style Reasoning": Technical explanation of why this specific outfit works for the weather.
+    4. A "Fun Activity" optimized for this vibe.
+    5. A "Coffee/Dining Vibe".
+    6. "Store Type".
 
     Style Rules:
     - Breathable for high humidity (>80%).
@@ -39,11 +41,12 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
           footwear: { type: Type.STRING },
           proTip: { type: Type.STRING },
           styleReasoning: { type: Type.STRING },
+          weatherStory: { type: Type.STRING },
           activity: { type: Type.STRING },
           coffeeSpot: { type: Type.STRING },
           storeType: { type: Type.STRING },
         },
-        required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "activity", "coffeeSpot", "storeType"]
+        required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
       }
     }
   });

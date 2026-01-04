@@ -349,9 +349,8 @@ const StylistTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Straightforward Stylist Verdict */}
       {currentOutfit && weather && (
-        <div className="px-5 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="px-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           
           {/* Header & Context Summary */}
           <div className="flex items-start justify-between">
@@ -387,47 +386,54 @@ const StylistTab: React.FC<Props> = ({
             </button>
           </div>
 
-          {/* Verdict List */}
-          <div className="space-y-10">
-            {/* The Fit Block */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="h-[1px] flex-1 bg-gray-100" />
-                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Fit</span>
-                <div className="h-[1px] flex-1 bg-gray-100" />
-              </div>
-              
-              <div className="space-y-6">
-                <VerdictItem icon={<Shirt className="w-5 h-5" />} label="Outerwear" value={currentOutfit.outerwear} accent="indigo" />
-                <VerdictItem icon={<Zap className="w-5 h-5" />} label="Base Layer" value={currentOutfit.baseLayer} accent="indigo" />
-                <VerdictItem icon={<Footprints className="w-5 h-5" />} label="Footwear" value={currentOutfit.footwear} accent="indigo" />
-              </div>
+          {/* New Narrative Block - Placed on Top of Fit */}
+          <div className="bg-indigo-600 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
+            <Sparkles className="absolute -top-4 -right-4 w-20 h-20 opacity-10" />
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Weather Story</p>
+            <p className="text-xs font-bold leading-relaxed tracking-tight">
+              {currentOutfit.weatherStory}
+            </p>
+          </div>
+
+          {/* The Fit Block - Compacted to show in viewport */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="h-[1px] flex-1 bg-gray-100" />
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Fit</span>
+              <div className="h-[1px] flex-1 bg-gray-100" />
             </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <VerdictItem icon={<Shirt className="w-5 h-5" />} label="Outerwear" value={currentOutfit.outerwear} accent="indigo" />
+              <VerdictItem icon={<Zap className="w-5 h-5" />} label="Base Layer" value={currentOutfit.baseLayer} accent="indigo" />
+              <VerdictItem icon={<Footprints className="w-5 h-5" />} label="Footwear" value={currentOutfit.footwear} accent="indigo" />
+            </div>
+          </div>
 
-            {/* Note: "The Plan" block was removed here and moved to the 'Plan' tab */}
-
-            {/* Stylist Reasoning - Fully Visible */}
-            <div className="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
-              <Sparkles className="absolute -top-4 -right-4 w-24 h-24 opacity-10" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-4">Stylist Reasoning</p>
-              <p className="text-sm font-bold leading-relaxed tracking-tight">
+          {/* Split Block: Technical Logic & Pro Tip */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="bg-white border border-gray-100 p-5 rounded-[2rem] shadow-sm">
+              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Stylist Reasoning</p>
+              <p className="text-[11px] font-bold text-gray-600 leading-relaxed uppercase tracking-tight">
                 {currentOutfit.styleReasoning}
               </p>
-              <div className="mt-6 pt-6 border-t border-white/10 flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 animate-pulse" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Pro Tip: {currentOutfit.proTip}</p>
-              </div>
             </div>
-
-            {/* Call to action for the Plan tab */}
-            <button 
-              onClick={() => onTabChange(AppTab.PLAN)}
-              className="w-full py-5 bg-indigo-50 border border-indigo-100 rounded-[2rem] flex items-center justify-center gap-3 active:scale-95 transition-all group"
-            >
-              <Compass className="w-4 h-4 text-indigo-600 group-hover:rotate-45 transition-transform" />
-              <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Explore Your Plan for Today</span>
-            </button>
+            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-[1.5rem] flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-900 leading-tight">
+                Pro Tip: {currentOutfit.proTip}
+              </p>
+            </div>
           </div>
+
+          {/* Explore Button */}
+          <button 
+            onClick={() => onTabChange(AppTab.PLAN)}
+            className="w-full py-5 bg-white border border-indigo-100 rounded-[2rem] flex items-center justify-center gap-3 active:scale-95 transition-all group"
+          >
+            <Compass className="w-4 h-4 text-indigo-600 group-hover:rotate-45 transition-transform" />
+            <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Explore Your Plan for Today</span>
+          </button>
         </div>
       )}
     </div>
@@ -451,16 +457,15 @@ const VerdictItem: React.FC<VerdictItemProps> = ({ icon, label, value, accent, o
   };
 
   return (
-    <div className="flex items-start gap-5 group" onClick={onAction}>
-      <div className={`p-4 rounded-3xl shrink-0 transition-transform duration-300 group-hover:scale-110 ${colors[accent]}`}>
+    <div className="flex items-center gap-4 group" onClick={onAction}>
+      <div className={`p-3 rounded-2xl shrink-0 transition-transform duration-300 group-hover:scale-110 ${colors[accent]}`}>
         {icon}
       </div>
-      <div className="flex-1 space-y-1">
+      <div className="flex-1 space-y-0.5">
         <div className="flex items-center justify-between">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
-          {onAction && <ArrowRight className="w-3 h-3 text-indigo-400" />}
+          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
         </div>
-        <h4 className="text-base font-black text-gray-900 leading-tight uppercase tracking-tight">{value}</h4>
+        <h4 className="text-[13px] font-black text-gray-900 leading-tight uppercase tracking-tight line-clamp-2">{value}</h4>
       </div>
     </div>
   );
