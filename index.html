@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS for Map Component -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -21,6 +23,25 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    /* Map Container styling */
+    #aura-map {
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+    }
+    .leaflet-container {
+      background: #f1f5f9;
+      font-family: inherit;
+    }
+    .leaflet-bar {
+      border: none !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+    .leaflet-bar a {
+      background-color: white !important;
+      color: #4f46e5 !important;
+      border: 1px solid #f1f5f9 !important;
+    }
   </style>
 <script type="importmap">
 {
@@ -31,7 +52,8 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "resend": "https://esm.sh/resend@^6.6.0",
-    "framer-motion": "https://esm.sh/framer-motion@^11.11.11"
+    "framer-motion": "https://esm.sh/framer-motion@^11.11.11",
+    "leaflet": "https://esm.sh/leaflet@^1.9.4"
   }
 }
 </script>

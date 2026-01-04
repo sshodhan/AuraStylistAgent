@@ -11,12 +11,12 @@ export const fetchWeather = async (lat: number, lon: number, locationName: strin
     temp: current.temperature_2m,
     precip: current.precipitation,
     wind: current.wind_speed_10m,
-    location: locationName
+    location: locationName,
+    coords: { lat, lon }
   };
 };
 
 export const geocode = async (location: string): Promise<{ lat: number; lon: number } | null> => {
-  // Simple geocoding using a free API or fallback
   try {
     const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`);
     const data = await response.json();

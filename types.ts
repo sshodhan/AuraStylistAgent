@@ -6,6 +6,7 @@ export interface WeatherData {
   precip: number;
   wind: number;
   location: string;
+  coords?: { lat: number; lon: number };
 }
 
 export interface OutfitSuggestion {
@@ -27,4 +28,5 @@ export enum AppTab {
 export interface GroundingLink {
   uri: string;
   title: string;
+  coords?: { lat: number; lon: number };
 }
