@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OutfitSuggestion, WeatherData, TempUnit, AppTab } from '../types';
 import { generateOutfitImages, editImage } from '../services/geminiService';
-import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand } from 'lucide-react';
+import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand, Globe } from 'lucide-react';
 
 interface Props {
   outfit: OutfitSuggestion | null;
@@ -129,10 +129,12 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
     );
   }
 
+  const variationsLabel = ["Modernist", "Avant-Garde", "Urban Heritage"];
+
   return (
     <div className="space-y-4 pb-8 animate-in fade-in duration-500">
       {/* Back Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 px-1">
         <button 
           onClick={() => onTabChange(AppTab.STYLIST)}
           className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-500 hover:text-indigo-600 shadow-sm transition-all active:scale-95"
@@ -232,7 +234,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       </div>
 
       {/* Studio Controls */}
-      <div className="bg-white p-5 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
+      <div className="bg-white p-5 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4 mx-1">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-black flex items-center gap-2 text-gray-900 uppercase tracking-widest">
             <Sparkles className="text-indigo-600 w-4 h-4" />
@@ -273,14 +275,14 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
           ) : (
             <>
               {userPhoto && <Zap className="w-4 h-4" />}
-              {userPhoto ? "Personalized Fit Check" : "Generate Lookbook"}
+              {userPhoto ? "Personalized Fit Check" : "Generate Range Brief"}
             </>
           )}
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 border border-red-100">
+        <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 border border-red-100 mx-1">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <p>{error}</p>
         </div>
@@ -289,24 +291,24 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       {/* Gallery Section */}
       <div className="space-y-6">
         {loading ? (
-          <div className="aspect-[3/4] bg-gray-50 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-6">
+          <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-6">
             <div className="relative">
                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                <Camera className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-600 w-6 h-6" />
             </div>
             <div className="text-center space-y-1 px-12">
               <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest animate-pulse">
-                {userPhoto ? "Rendering Your Likeness" : "Rendering Lookbook"}
+                {userPhoto ? "Rendering Your Likeness" : "Rendering Global Range"}
               </p>
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-tighter">
                 {userPhoto 
                   ? "Aura is carefully mapping the recommendation onto your photo..." 
-                  : "Generating 3 unique models with tailored atmospheric textures"}
+                  : "Depicting a range of stylish individuals in varied urban contexts..."}
               </p>
             </div>
           </div>
         ) : imageUrls ? (
-          <div className="space-y-6">
+          <div className="space-y-8 px-1">
             {imageUrls.map((url, idx) => (
               <div key={idx} className="space-y-3">
                 <div className="relative aspect-[3/4] bg-gray-50 rounded-[3rem] overflow-hidden border border-gray-100 shadow-lg animate-in zoom-in-95 duration-500">
@@ -315,9 +317,12 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                   {/* Overlay Controls */}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-8 flex justify-between items-end">
                     <div className="text-white">
-                      <p className="text-[8px] font-black opacity-60 uppercase tracking-widest mb-1">
-                        {userPhoto ? "Personalized Look" : "Look Details"}
-                      </p>
+                      <div className="flex items-center gap-2 mb-1 opacity-60">
+                         {userPhoto ? <User className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                         <p className="text-[8px] font-black uppercase tracking-widest">
+                           {userPhoto ? "Personalized Look" : `${variationsLabel[idx]} Interpretation`}
+                         </p>
+                      </div>
                       <p className="text-xs font-bold leading-tight line-clamp-2 max-w-[160px]">{outfit.outerwear}</p>
                     </div>
                     <div className="flex gap-2">
@@ -414,7 +419,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
             ))}
           </div>
         ) : (
-          <div className="aspect-[3/4] bg-gray-50 rounded-[3rem] flex flex-col items-center justify-center p-12 text-center space-y-4 opacity-40 border border-gray-100">
+          <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] flex flex-col items-center justify-center p-12 text-center space-y-4 opacity-40 border border-gray-100">
             <Camera className="w-10 h-10 text-gray-300" />
             <div className="text-center space-y-2">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Ready for Command</p>

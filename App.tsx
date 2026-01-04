@@ -7,6 +7,15 @@ import VisualizeTab from './components/VisualizeTab';
 import PlanTab from './components/PlanTab';
 import SettingsTab from './components/SettingsTab';
 import { Cloud, Mic, Sparkles, Compass, Shirt, Settings } from 'lucide-react';
+import { fetchWeather } from './services/weatherService';
+
+const CACHE_KEYS = {
+  WEATHER: 'aura_cached_weather',
+  OUTFIT: 'aura_cached_outfit',
+  HERO: 'aura_cached_hero',
+  IMAGES: 'aura_cached_images',
+  TIMESTAMP: 'aura_cache_timestamp'
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.STYLIST);
@@ -19,7 +28,57 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "YOU");
   const [visualizeTriggered, setVisualizeTriggered] = useState(false);
 
-  // Sync user name from local storage periodically or when settings might change it
+  // 1. Initial Hydration from Cache
+  useEffect(() => {
+    const cachedWeather = localStorage.getItem(CACHE_KEYS.WEATHER);
+    const cachedOutfit = localStorage.getItem(CACHE_KEYS.OUTFIT);
+    const cachedHero = localStorage.getItem(CACHE_KEYS.HERO);
+    const cachedImages = localStorage.getItem(CACHE_KEYS.IMAGES);
+    const cachedTime = localStorage.getItem(CACHE_KEYS.TIMESTAMP);
+
+    if (cachedWeather) setWeather(JSON.parse(cachedWeather));
+    if (cachedOutfit) setOutfit(JSON.parse(cachedOutfit));
+    if (cachedHero) setWeatherHero(cachedHero);
+    if (cachedImages) setOutfitImages(JSON.parse(cachedImages));
+
+    // Background refresh check (2 hours)
+    if (cachedTime && cachedWeather) {
+      const weatherObj = JSON.parse(cachedWeather);
+      const now = Date.now();
+      const age = now - parseInt(cachedTime);
+      if (age > 1000 * 60 * 60 * 2 && weatherObj.coords) {
+        console.log("Weather cache stale, performing background refresh...");
+        fetchWeather(weatherObj.coords.lat, weatherObj.coords.lon, weatherObj.location)
+          .then(newWeather => {
+            setWeather(newWeather);
+            localStorage.setItem(CACHE_KEYS.WEATHER, JSON.stringify(newWeather));
+            localStorage.setItem(CACHE_KEYS.TIMESTAMP, Date.now().toString());
+          });
+      }
+    }
+  }, []);
+
+  // 2. State Persistence Logic
+  useEffect(() => {
+    if (weather) {
+      localStorage.setItem(CACHE_KEYS.WEATHER, JSON.stringify(weather));
+      localStorage.setItem(CACHE_KEYS.TIMESTAMP, Date.now().toString());
+    }
+  }, [weather]);
+
+  useEffect(() => {
+    if (outfit) localStorage.setItem(CACHE_KEYS.OUTFIT, JSON.stringify(outfit));
+  }, [outfit]);
+
+  useEffect(() => {
+    if (weatherHero) localStorage.setItem(CACHE_KEYS.HERO, weatherHero);
+  }, [weatherHero]);
+
+  useEffect(() => {
+    if (outfitImages) localStorage.setItem(CACHE_KEYS.IMAGES, JSON.stringify(outfitImages));
+  }, [outfitImages]);
+
+  // Sync user name from local storage periodically
   useEffect(() => {
     const handleStorageChange = () => {
       setUserName((localStorage.getItem('aura_user_name') || "YOU").toUpperCase());
@@ -34,7 +93,6 @@ const App: React.FC = () => {
       const name = localStorage.getItem('aura_user_name');
       setUserName(name ? name.toUpperCase() : "YOU");
     }
-    // Reset trigger when tab changes
     if (activeTab !== AppTab.VISUALIZE) {
       setVisualizeTriggered(false);
     }
@@ -63,7 +121,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full max-w-md mx-auto flex flex-col bg-white overflow-hidden relative selection:bg-indigo-100">
-      {/* Fixed App Header */}
       <header className="px-5 py-4 relative flex justify-between items-center bg-white z-30 shrink-0 border-b border-gray-100">
         <div className="flex items-center z-10">
           <div className="bg-indigo-600 p-2 rounded-xl shadow-md shadow-indigo-100">
@@ -110,7 +167,6 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Internal Scrollable Content Area */}
       <main className="flex-1 overflow-hidden relative">
         <div className="h-full w-full overflow-y-auto overscroll-contain">
           <div className="p-4 space-y-4">
@@ -149,7 +205,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Fixed Bottom Navigation */}
       <nav className="border-t border-gray-50 bg-white px-2 py-3 shrink-0 z-30 shadow-[0_-8px_30px_rgb(0,0,0,0.02)]">
         <div className="flex justify-around items-center max-w-lg mx-auto">
           {tabs.map((tab) => {

@@ -78,7 +78,7 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
   return response.text || "Your daily style brief is ready.";
 };
 
-// Generates a singular outfit image
+// Generates a singular outfit image with deep contextual steering
 export const generateOutfitImage = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -92,10 +92,16 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
-  const prompt = `Editorial photo of ${subject} in ${weather.location}. 
-  STYLE: ${visualVariation}, PALETTE: ${paletteHint}.
+  // Enhanced prompt to avoid identicality and map to vibe
+  const prompt = `High-end editorial fashion photography. 
+  SUBJECT: ${userImage ? 'the person provided in the reference photo' : subject}.
+  LOCATION: An atmospheric street in ${weather.location}, specifically near a ${outfit.coffeeSpot}.
+  ACTIVITY: The subject is ${outfit.activity}.
+  LIGHTING: Cinematic lighting matching ${displayTemp}°${unit} weather conditions.
+  STYLE: ${visualVariation}, aesthetic matching ${outfit.styleReasoning}.
+  PALETTE: ${paletteHint}.
   OUTFIT: ${outfit.baseLayer}, ${outfit.outerwear}, ${outfit.footwear}.
-  ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting.`;
+  QUALITY: Photorealistic, 8k resolution, fashion magazine quality.`;
   
   const parts: any[] = [{ text: prompt }];
   if (userImage) {
@@ -121,7 +127,7 @@ export const generateOutfitImage = async (
   throw new Error("No image data found.");
 };
 
-// Generates 3 visually distinct variations
+// Generates 3 visually distinct variations with a range of people
 export const generateOutfitImages = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -129,14 +135,27 @@ export const generateOutfitImages = async (
   unit: TempUnit = 'F',
   userImage?: string
 ): Promise<string[]> => {
+  // Diverse range of people for the baseline variations if no user photo is provided
   const variations = [
-    { palette: "Minimalist Neutrals", theme: "Sleek Minimalist" },
-    { palette: "Bold Statement Tones", theme: "Vibrant & Textural" },
-    { palette: "Urban Heritage", theme: "Classic Sophisticate" }
+    { 
+      palette: "Sophisticated Neutrals", 
+      theme: "Sleek & Modernist", 
+      subject: "A stylish East Asian person in their late 20s with a sharp, contemporary look" 
+    },
+    { 
+      palette: "Rich Textural Tones", 
+      theme: "Bold & Avant-garde", 
+      subject: "A confident Black individual with a unique and expressive fashion sense" 
+    },
+    { 
+      palette: "Urban Heritage Earthtones", 
+      theme: "Classic & Timeless", 
+      subject: "A person in their late 40s of Hispanic heritage reflecting sophisticated urban elegance" 
+    }
   ];
 
   return Promise.all(variations.map(v => 
-    generateOutfitImage(outfit, weather, size, unit, "a stylish person", userImage, v.theme, v.palette)
+    generateOutfitImage(outfit, weather, size, unit, v.subject, userImage, v.theme, v.palette)
   ));
 };
 
