@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppTab, WeatherData, OutfitSuggestion, TempUnit } from './types';
 import StylistTab from './components/StylistTab';
 import VoiceTab from './components/VoiceTab';
@@ -15,6 +15,24 @@ const App: React.FC = () => {
   const [weatherHero, setWeatherHero] = useState<string | null>(null);
   const [outfitImages, setOutfitImages] = useState<string[] | null>(null);
   const [unit, setUnit] = useState<TempUnit>('F');
+  const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "You");
+
+  // Sync user name from local storage periodically or when settings might change it
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setUserName(localStorage.getItem('aura_user_name') || "You");
+    };
+    window.addEventListener('storage', handleStorageChange);
+    // Also poll slightly if needed, or rely on Tab changes as a proxy for settings updates
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Sync name when switching back from settings
+  useEffect(() => {
+    if (activeTab === AppTab.STYLIST) {
+      setUserName(localStorage.getItem('aura_user_name') || "You");
+    }
+  }, [activeTab]);
 
   const tabs = [
     { id: AppTab.STYLIST, label: 'Stylist', icon: Shirt },
@@ -30,34 +48,52 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full max-w-md mx-auto flex flex-col bg-white overflow-hidden relative selection:bg-indigo-100">
-      {/* Fixed App Header */}
-      <header className="px-5 py-4 flex justify-between items-center bg-white/80 backdrop-blur-md z-30 shrink-0 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-100">
-            <Cloud className="text-white w-5 h-5" />
+      {/* Fixed App Header with Centered Location */}
+      <header className="px-5 py-3 relative flex justify-between items-center bg-white/80 backdrop-blur-md z-30 shrink-0 border-b border-gray-100">
+        {/* Left Section: Logo */}
+        <div className="flex items-center gap-2 z-10">
+          <div className="bg-indigo-600 p-1.5 rounded-lg shadow-md shadow-indigo-100">
+            <Cloud className="text-white w-4 h-4" />
           </div>
-          <h1 className="text-lg font-black text-gray-900 tracking-tight">Aura</h1>
+          <h1 className="text-sm font-black text-gray-900 tracking-tighter hidden sm:block">Aura</h1>
+        </div>
+
+        {/* Center Section: Location & Welcome (The core of the request) */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          {weather ? (
+            <div className="flex flex-col items-center animate-in fade-in slide-in-from-top-1 duration-500">
+              <h2 className="text-[13px] font-black text-gray-900 uppercase tracking-tighter leading-none">
+                {weather.location}
+              </h2>
+              <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.2em] mt-0.5 leading-none">
+                welcome {userName}
+              </p>
+            </div>
+          ) : (
+             <h1 className="text-sm font-black text-gray-900 tracking-tighter">Aura</h1>
+          )}
         </div>
         
-        <div className="flex items-center gap-3">
+        {/* Right Section: Units & Temp */}
+        <div className="flex items-center gap-2 z-10">
           <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
             {(['C', 'F'] as TempUnit[]).map((u) => (
               <button
                 key={u}
                 onClick={() => setUnit(u)}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${
+                className={`px-2 py-1 rounded-md text-[9px] font-black transition-all ${
                   unit === u 
                     ? 'bg-white text-indigo-600 shadow-sm' 
                     : 'text-gray-400'
                 }`}
               >
-                °{u}
+                {u}
               </button>
             ))}
           </div>
           {weather && (
-            <div className="bg-indigo-50 px-2 py-1 rounded-lg">
-              <p className="text-[10px] font-black text-indigo-600 leading-none">{displayTemp}°{unit}</p>
+            <div className="bg-indigo-50 px-1.5 py-1 rounded-lg">
+              <p className="text-[10px] font-black text-indigo-600 leading-none">{displayTemp}°</p>
             </div>
           )}
         </div>
