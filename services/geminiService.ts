@@ -79,6 +79,7 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
 };
 
 // Generates a singular outfit image with deep contextual steering
+// MODEL: gemini-3-pro-image-preview is used for high-fidelity identity preservation
 export const generateOutfitImage = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -92,7 +93,6 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
-  // Enhanced prompt to avoid identicality and map to vibe
   const prompt = `High-end editorial fashion photography. 
   SUBJECT: ${userImage ? 'the person provided in the reference photo' : subject}.
   LOCATION: An atmospheric street in ${weather.location}, specifically near a ${outfit.coffeeSpot}.
@@ -101,7 +101,8 @@ export const generateOutfitImage = async (
   STYLE: ${visualVariation}, aesthetic matching ${outfit.styleReasoning}.
   PALETTE: ${paletteHint}.
   OUTFIT: ${outfit.baseLayer}, ${outfit.outerwear}, ${outfit.footwear}.
-  QUALITY: Photorealistic, 8k resolution, fashion magazine quality.`;
+  QUALITY: Photorealistic, 8k resolution, fashion magazine quality. 
+  CRITICAL: Maintain the exact facial structure and identity of the reference photo if provided.`;
   
   const parts: any[] = [{ text: prompt }];
   if (userImage) {
@@ -127,7 +128,6 @@ export const generateOutfitImage = async (
   throw new Error("No image data found.");
 };
 
-// Generates 3 visually distinct variations with a range of people
 export const generateOutfitImages = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -135,23 +135,10 @@ export const generateOutfitImages = async (
   unit: TempUnit = 'F',
   userImage?: string
 ): Promise<string[]> => {
-  // Diverse range of people for the baseline variations if no user photo is provided
   const variations = [
-    { 
-      palette: "Sophisticated Neutrals", 
-      theme: "Sleek & Modernist", 
-      subject: "A stylish East Asian person in their late 20s with a sharp, contemporary look" 
-    },
-    { 
-      palette: "Rich Textural Tones", 
-      theme: "Bold & Avant-garde", 
-      subject: "A confident Black individual with a unique and expressive fashion sense" 
-    },
-    { 
-      palette: "Urban Heritage Earthtones", 
-      theme: "Classic & Timeless", 
-      subject: "A person in their late 40s of Hispanic heritage reflecting sophisticated urban elegance" 
-    }
+    { palette: "Sophisticated Neutrals", theme: "Sleek & Modernist", subject: "A stylish East Asian person" },
+    { palette: "Rich Textural Tones", theme: "Bold & Avant-garde", subject: "A confident Black individual" },
+    { palette: "Urban Heritage Earthtones", theme: "Classic & Timeless", subject: "A person reflecting sophisticated urban elegance" }
   ];
 
   return Promise.all(variations.map(v => 
@@ -195,14 +182,18 @@ export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempU
   throw new Error("No weather hero image found.");
 };
 
+// GOOGLE MAPS GROUNDING INTEGRATION
 export const getPlanRecommendations = async (location: string, outfit: OutfitSuggestion, lat: number, lon: number): Promise<{ text: string, links: GroundingLink[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `Find specific places near ${location} for these 3 purposes matching a ${outfit.activity}, a ${outfit.coffeeSpot}, and ${outfit.storeType}.
-    1. A place to explore (for: ${outfit.activity})
-    2. A place to eat/drink (for: ${outfit.coffeeSpot})
-    3. A place to shop (for: ${outfit.storeType})
-    For EACH place found, provide a 5-word reason why it perfectly matches the client's current outfit/vibe.`;
+  const prompt = `I need specifically grounded locations in ${location} for these categories:
+    1. Explore: ${outfit.activity}
+    2. Eat/Drink: ${outfit.coffeeSpot}
+    3. Shop: ${outfit.storeType}
+    
+    CRITICAL INSTRUCTION: For EVERY place found, you MUST provide a line in this exact format:
+    "[Place Name] - Reason: [A exactly 5-word description of why this fits the outfit and mood]"
+    Example: "The Roastery - Reason: Warm lighting complements your knits."`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -214,33 +205,48 @@ export const getPlanRecommendations = async (location: string, outfit: OutfitSug
   });
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  const responseText = response.text || "";
+  
+  const reasonsMap: Record<string, string> = {};
+  const reasonMatches = responseText.matchAll(/(.*?) - Reason: (.*)/g);
+  for (const match of reasonMatches) {
+    const title = match[1].trim().toLowerCase();
+    const reason = match[2].trim();
+    reasonsMap[title] = reason;
+  }
   
   const links: GroundingLink[] = groundingChunks
     .filter((chunk: any) => chunk.maps)
     .map((chunk: any) => {
-      const title = chunk.maps.title.toLowerCase();
+      const originalTitle = chunk.maps.title;
+      const titleLower = originalTitle.toLowerCase();
       let type: 'eat' | 'explore' | 'shop' | undefined;
       
-      if (title.includes('cafe') || title.includes('restaurant') || title.includes('bistro') || title.includes('roast') || title.includes('bar')) {
+      if (titleLower.includes('cafe') || titleLower.includes('coffee') || titleLower.includes('restaurant') || titleLower.includes('bistro') || titleLower.includes('bar') || titleLower.includes('pub')) {
         type = 'eat';
-      } else if (title.includes('park') || title.includes('museum') || title.includes('center') || title.includes('gallery') || title.includes('pier')) {
+      } else if (titleLower.includes('park') || titleLower.includes('museum') || titleLower.includes('gallery') || titleLower.includes('landmark') || titleLower.includes('pier') || titleLower.includes('square')) {
         type = 'explore';
       } else {
         type = 'shop';
       }
 
-      // Fallback reason if we can't extract it easily from response text
-      const reason = "Matches your current urban aesthetic.";
+      let reason = "Perfectly fits your current aesthetic.";
+      for (const [key, val] of Object.entries(reasonsMap)) {
+        if (titleLower.includes(key) || key.includes(titleLower)) {
+          reason = val;
+          break;
+        }
+      }
       
       return { 
         uri: chunk.maps.uri, 
-        title: chunk.maps.title,
+        title: originalTitle,
         reason: reason,
         type
       };
     }) || [];
 
-  return { text: response.text || "", links };
+  return { text: responseText, links };
 };
 
 export function decode(base64: string) {

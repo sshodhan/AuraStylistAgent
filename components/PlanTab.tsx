@@ -31,7 +31,7 @@ interface Props {
 
 // Formatter to turn the "blob" of text into readable segments
 const StrategyFormatter: React.FC<{ text: string, inverse?: boolean }> = ({ text, inverse = false }) => {
-  const sections = text.split('\n').filter(s => s.trim().length > 0);
+  const sections = text.split('\n').filter(s => s.trim().length > 0 && !s.includes('- Reason:'));
   
   return (
     <div className="space-y-4">
@@ -149,6 +149,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
 
   return (
     <div className="flex flex-col space-y-6 pb-12 animate-in fade-in duration-500">
+      {/* Top Brief Section */}
       <div className="px-2 space-y-4">
         <div className="flex items-center justify-between">
            <h2 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Plan Brief</h2>
@@ -164,17 +165,18 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
         </div>
       </div>
 
-      <div className="relative h-[300px] rounded-[3rem] overflow-hidden border border-gray-100 shadow-2xl bg-gray-50 mx-1">
+      {/* Map View */}
+      <div className="relative h-[280px] rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl bg-gray-50 mx-1">
         <div ref={mapContainerRef} className="h-full w-full" id="aura-map-container" />
         <div className="absolute top-4 inset-x-4 z-[1000] flex justify-between items-center pointer-events-none">
-          <div className="flex gap-1.5 pointer-events-auto">
+          <div className="flex gap-1.5 pointer-events-auto overflow-x-auto scrollbar-hide pb-2">
              {['all', 'eat', 'explore', 'shop'].map(f => (
-               <button key={f} onClick={() => setActiveFilter(f as any)} className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeFilter === f ? 'bg-indigo-600 text-white shadow-xl' : 'bg-white/90 backdrop-blur-md text-gray-600 shadow-sm'}`}>
+               <button key={f} onClick={() => setActiveFilter(f as any)} className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeFilter === f ? 'bg-indigo-600 text-white shadow-xl' : 'bg-white/95 backdrop-blur-md text-gray-600 shadow-sm'}`}>
                  {f === 'all' ? 'All Gems' : f}
                </button>
              ))}
           </div>
-          <button onClick={() => mapInstanceRef.current?.flyTo([weather.coords?.lat || 0, weather.coords?.lon || 0], 14)} className="p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 pointer-events-auto">
+          <button onClick={() => mapInstanceRef.current?.flyTo([weather.coords?.lat || 0, weather.coords?.lon || 0], 14)} className="p-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 pointer-events-auto">
             <Crosshair className="w-4 h-4" />
           </button>
         </div>
@@ -184,23 +186,26 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
              <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-             <p className="text-[11px] font-black uppercase text-gray-900 tracking-widest">Grounded Planning Active...</p>
+             <p className="text-[11px] font-black uppercase text-gray-900 tracking-widest">Generating Itinerary...</p>
           </div>
         ) : (
           <>
+            {/* Collapsible Strategy Card - Matching Screenshot */}
             {recommendations && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-950 rounded-[3.5rem] shadow-2xl relative overflow-hidden mx-1">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-950 rounded-[2.5rem] shadow-2xl relative overflow-hidden mx-1">
                 <button 
                   onClick={() => setIsStrategyExpanded(!isStrategyExpanded)}
-                  className="w-full p-8 flex items-center justify-between text-left group"
+                  className="w-full p-6 flex items-center justify-between text-left group"
                 >
                   <div className="flex items-center gap-4">
                     <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
                         <Sparkles className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">Itinerary Strategy</h4>
-                      <p className="text-[8px] font-bold text-white/30 uppercase mt-0.5">{isStrategyExpanded ? 'Collapse' : 'Expand'} Details</p>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-100">Itinerary Strategy</h4>
+                      <p className="text-[9px] font-bold text-indigo-400 uppercase mt-0.5 tracking-widest opacity-80">
+                        {isStrategyExpanded ? 'Collapse Details' : 'Expand Details'}
+                      </p>
                     </div>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-indigo-300 transition-transform duration-500 ${isStrategyExpanded ? 'rotate-180' : 'rotate-0'}`} />
@@ -216,6 +221,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
               </motion.div>
             )}
 
+            {/* Destination Sections with 3-item limit and VV expansion */}
             <div className="space-y-12">
                <DestinationSection title="Eat & Drink" type="eat" gems={gems} onLocate={handleLocateGem} />
                <DestinationSection title="Explore & Play" type="explore" gems={gems} onLocate={handleLocateGem} />
@@ -235,7 +241,7 @@ const PlanSummaryCard: React.FC<{ icon: React.ReactNode, label: string, value: s
       <div className={`p-4 rounded-3xl ${colors[accent]}`}>{icon}</div>
       <div className="flex-1">
         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-        <h4 className="text-xs font-black text-gray-950 uppercase leading-tight tracking-tight">{value}</h4>
+        <h4 className="text-xs font-black text-gray-900 uppercase leading-tight tracking-tight line-clamp-1">{value}</h4>
       </div>
       <ArrowRight className="w-3 h-3 text-gray-300 mr-2" />
     </div>
@@ -257,29 +263,36 @@ const DestinationSection: React.FC<{ title: string, type: string, gems: Localize
       </div>
       <div className="grid grid-cols-1 gap-4">
         {displayItems.map((gem) => (
-          <div key={gem.id} onClick={() => onLocate(gem)} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-indigo-200 transition-all flex items-center justify-between group cursor-pointer">
+          <motion.div 
+            key={gem.id} 
+            onClick={() => onLocate(gem)}
+            layout
+            className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:border-indigo-200 transition-all flex items-center justify-between group cursor-pointer"
+          >
             <div className="flex items-center gap-5">
-              <div className="bg-indigo-50 p-4 rounded-3xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
+              <div className="bg-indigo-50 p-4 rounded-full text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner border-2 border-white">
                 <MapPin className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <span className="text-[13px] font-black text-gray-950 uppercase tracking-tight line-clamp-1">{gem.title}</span>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{gem.reason || "Verified Spot"}</p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
+                  {gem.reason || "Verified for your current mood."}
+                </p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-gray-300" />
-          </div>
+          </motion.div>
         ))}
       </div>
       {filtered.length > 3 && (
         <button 
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full py-4 border-2 border-dashed border-gray-100 rounded-[2rem] text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+          className="w-full py-4 bg-gray-50 border border-gray-100 rounded-[2rem] text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-white hover:shadow-md transition-all active:scale-95"
         >
           {isExpanded ? (
-            <>Show Less <ChevronDown className="w-3 h-3 rotate-180" /></>
+            <>Collapse Details <ChevronDown className="w-4 h-4 rotate-180" /></>
           ) : (
-            <>View All ({filtered.length}) <ChevronDown className="w-3 h-3" /></>
+            <>View All (${filtered.length}) <ChevronDown className="w-4 h-4" /></>
           )}
         </button>
       )}
