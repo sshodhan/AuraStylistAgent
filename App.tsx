@@ -15,22 +15,22 @@ const App: React.FC = () => {
   const [weatherHero, setWeatherHero] = useState<string | null>(null);
   const [outfitImages, setOutfitImages] = useState<string[] | null>(null);
   const [unit, setUnit] = useState<TempUnit>('F');
-  const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "You");
+  const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "YOU");
 
   // Sync user name from local storage periodically or when settings might change it
   useEffect(() => {
     const handleStorageChange = () => {
-      setUserName(localStorage.getItem('aura_user_name') || "You");
+      setUserName((localStorage.getItem('aura_user_name') || "YOU").toUpperCase());
     };
     window.addEventListener('storage', handleStorageChange);
-    // Also poll slightly if needed, or rely on Tab changes as a proxy for settings updates
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Sync name when switching back from settings
   useEffect(() => {
     if (activeTab === AppTab.STYLIST) {
-      setUserName(localStorage.getItem('aura_user_name') || "You");
+      const name = localStorage.getItem('aura_user_name');
+      setUserName(name ? name.toUpperCase() : "YOU");
     }
   }, [activeTab]);
 
@@ -48,35 +48,34 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full max-w-md mx-auto flex flex-col bg-white overflow-hidden relative selection:bg-indigo-100">
-      {/* Fixed App Header with Centered Location */}
-      <header className="px-5 py-3 relative flex justify-between items-center bg-white/80 backdrop-blur-md z-30 shrink-0 border-b border-gray-100">
-        {/* Left Section: Logo */}
-        <div className="flex items-center gap-2 z-10">
-          <div className="bg-indigo-600 p-1.5 rounded-lg shadow-md shadow-indigo-100">
+      {/* Fixed App Header - Centered Content based on Screenshot */}
+      <header className="px-5 py-4 relative flex justify-between items-center bg-white z-30 shrink-0 border-b border-gray-100">
+        {/* Left Section: Icon Only */}
+        <div className="flex items-center z-10">
+          <div className="bg-indigo-600 p-2 rounded-xl shadow-md shadow-indigo-100">
             <Cloud className="text-white w-4 h-4" />
           </div>
-          <h1 className="text-sm font-black text-gray-900 tracking-tighter hidden sm:block">Aura</h1>
         </div>
 
-        {/* Center Section: Location & Welcome (The core of the request) */}
+        {/* Center Section: Location & Welcome (Matching Screenshot Style) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           {weather ? (
             <div className="flex flex-col items-center animate-in fade-in slide-in-from-top-1 duration-500">
-              <h2 className="text-[13px] font-black text-gray-900 uppercase tracking-tighter leading-none">
+              <h2 className="text-[14px] font-black text-gray-900 uppercase tracking-tight leading-none">
                 {weather.location}
               </h2>
-              <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.2em] mt-0.5 leading-none">
-                welcome {userName}
+              <p className="text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em] mt-1.5 leading-none">
+                WELCOME {userName}
               </p>
             </div>
           ) : (
-             <h1 className="text-sm font-black text-gray-900 tracking-tighter">Aura</h1>
+             <h1 className="text-sm font-black text-gray-900 uppercase tracking-widest">Aura</h1>
           )}
         </div>
         
-        {/* Right Section: Units & Temp */}
+        {/* Right Section: Units & Temp (Matching Screenshot layout) */}
         <div className="flex items-center gap-2 z-10">
-          <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+          <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-100">
             {(['C', 'F'] as TempUnit[]).map((u) => (
               <button
                 key={u}
@@ -92,7 +91,7 @@ const App: React.FC = () => {
             ))}
           </div>
           {weather && (
-            <div className="bg-indigo-50 px-1.5 py-1 rounded-lg">
+            <div className="bg-indigo-50 px-1.5 py-1.5 rounded-lg">
               <p className="text-[10px] font-black text-indigo-600 leading-none">{displayTemp}°</p>
             </div>
           )}
@@ -135,7 +134,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Fixed Bottom Navigation */}
-      <nav className="border-t border-gray-100 bg-white/95 backdrop-blur-md px-2 py-3 shrink-0 z-30 shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
+      <nav className="border-t border-gray-50 bg-white px-2 py-3 shrink-0 z-30 shadow-[0_-8px_30px_rgb(0,0,0,0.02)]">
         <div className="flex justify-around items-center max-w-lg mx-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -144,9 +143,9 @@ const App: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center gap-1.5 px-3 py-1 rounded-2xl transition-all duration-300 relative ${
+                className={`flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 relative ${
                   isActive 
-                    ? 'text-indigo-600 scale-105' 
+                    ? 'text-indigo-600' 
                     : 'text-gray-400'
                 }`}
               >
@@ -155,7 +154,7 @@ const App: React.FC = () => {
                   {tab.label}
                 </span>
                 {isActive && (
-                  <div className="absolute -bottom-2 w-1 h-1 bg-indigo-600 rounded-full" />
+                  <div className="absolute -bottom-2 w-1.5 h-1.5 bg-indigo-600 rounded-full" />
                 )}
               </button>
             );

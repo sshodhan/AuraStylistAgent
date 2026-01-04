@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WeatherData, OutfitSuggestion, TempUnit, AppTab } from '../types';
 import { fetchWeather, geocode } from '../services/weatherService';
 import { getOutfitSuggestion, generateWeatherHeroImage } from '../services/geminiService';
@@ -9,7 +9,6 @@ import {
   Sparkles, 
   Camera, 
   Download, 
-  RefreshCw, 
   CloudIcon, 
   Sun, 
   CloudLightning, 
@@ -26,7 +25,7 @@ import {
   PartyPopper,
   MapPin,
   ChevronDown,
-  Edit2
+  X
 } from 'lucide-react';
 
 interface StylePersona {
@@ -61,6 +60,14 @@ interface Props {
   onTabChange: (tab: AppTab) => void;
 }
 
+interface CitySuggestion {
+  name: string;
+  country: string;
+  admin1?: string;
+  latitude: number;
+  longitude: number;
+}
+
 const StylistTab: React.FC<Props> = ({ 
   unit, 
   weather, 
@@ -74,23 +81,52 @@ const StylistTab: React.FC<Props> = ({
   onTabChange
 }) => {
   const [locationInput, setLocationInput] = useState('Seattle');
+  const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
+  const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
   const [context, setContext] = useState('casual');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLocationExpanded, setIsLocationExpanded] = useState(false);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  const handleGenerate = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const fetchSuggestions = async (query: string) => {
+    if (!query || query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setIsSearchingSuggestions(true);
+    try {
+      const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5`);
+      const data = await response.json();
+      setSuggestions(data.results || []);
+    } catch (err) {
+      console.error("Geocoding suggestions failed", err);
+    } finally {
+      setIsSearchingSuggestions(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocationInput(val);
+
+    if (searchTimeoutRef.current) window.clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = window.setTimeout(() => {
+      fetchSuggestions(val);
+    }, 400);
+  };
+
+  const selectCity = async (city: CitySuggestion) => {
     setLoading(true);
     setError(null);
+    setSuggestions([]);
+    setLocationInput(city.name);
     onOutfitImageUpdate(null);
     onHeroUpdate(null);
 
     try {
-      const coords = await geocode(locationInput);
-      if (!coords) throw new Error("Could not find location.");
-
-      const weatherData = await fetchWeather(coords.lat, coords.lon, locationInput);
+      const weatherData = await fetchWeather(city.latitude, city.longitude, city.name);
       onWeatherUpdate(weatherData);
 
       const [suggestion, hero] = await Promise.all([
@@ -98,6 +134,35 @@ const StylistTab: React.FC<Props> = ({
         generateWeatherHeroImage(weatherData, unit).catch(() => null)
       ]);
 
+      onOutfitUpdate(suggestion);
+      onHeroUpdate(hero);
+      setIsLocationExpanded(false);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerate = async (e?: React.FormEvent, overrideLocation?: string) => {
+    if (e) e.preventDefault();
+    const loc = overrideLocation || locationInput;
+    if (!loc) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const coords = await geocode(loc);
+      if (!coords) throw new Error(`Could not find location: ${loc}`);
+      
+      const weatherData = await fetchWeather(coords.lat, coords.lon, loc);
+      onWeatherUpdate(weatherData);
+      
+      const [suggestion, hero] = await Promise.all([
+        getOutfitSuggestion(weatherData, context, unit),
+        generateWeatherHeroImage(weatherData, unit).catch(() => null)
+      ]);
+      
       onOutfitUpdate(suggestion);
       onHeroUpdate(hero);
       setIsLocationExpanded(false);
@@ -130,7 +195,7 @@ const StylistTab: React.FC<Props> = ({
 
   useEffect(() => {
     if (!currentOutfit && !weather) {
-      handleGenerate();
+      handleGenerate(undefined, 'Seattle');
     }
   }, []);
 
@@ -144,13 +209,13 @@ const StylistTab: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-3 pb-4">
-      {/* Clean Hero Header */}
-      <div className="relative w-full aspect-[21/10] bg-gray-100 rounded-[1.5rem] overflow-hidden shadow-sm border border-gray-100 shrink-0">
+    <div className="space-y-4 pb-4">
+      {/* Visual Hero Card */}
+      <div className="relative w-full aspect-[21/10] bg-gray-100 rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 shrink-0">
         {(weatherHero && !loading) ? (
           <>
             <img src={weatherHero} alt="Weather" className="w-full h-full object-cover brightness-[0.8]" />
-            <div className="absolute inset-0 p-4 flex flex-col justify-end">
+            <div className="absolute inset-0 p-5 flex flex-col justify-end">
               <div className="text-white flex items-end justify-between">
                 <div>
                    <p className="text-2xl font-black tracking-tighter leading-none opacity-90 drop-shadow-md">{getDisplayTemp(weather!.temp)}°{unit}</p>
@@ -167,23 +232,30 @@ const StylistTab: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="absolute top-4 left-4 bg-white/10 backdrop-blur-md px-2 py-1.5 rounded-xl border border-white/20">
+              <div className="absolute top-5 left-5 bg-white/10 backdrop-blur-md px-2 py-2 rounded-xl border border-white/20">
                  {getWeatherIcon(weather!.precip, weather!.temp)}
               </div>
             </div>
           </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50">
-            <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
-            <p className="text-[8px] font-black uppercase text-indigo-400 mt-1.5 tracking-widest">Atmosphere Sync...</p>
+            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+            <p className="text-[8px] font-black uppercase text-indigo-400 mt-2 tracking-widest">Atmosphere Sync...</p>
           </div>
         )}
       </div>
 
-      {/* Tighter Style Mood Carousel */}
-      <div className="space-y-1.5">
-        <h3 className="px-1 text-[8px] font-black text-gray-400 uppercase tracking-widest">What's your vibe?</h3>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x px-1">
+      {/* Enhanced Bouncy Mood Carousel */}
+      <div className="space-y-2 relative">
+        <h3 className="px-1 text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">What's your vibe?</h3>
+        <div 
+          ref={carouselRef}
+          className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory overscroll-x-contain touch-pan-x px-4 -mx-4"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {/* Edge Padding Spacers for Snapping */}
+          <div className="flex-shrink-0 w-2 snap-center" />
+          
           {STYLE_PERSONAS.map((persona) => {
             const Icon = persona.icon;
             const isActive = context === persona.id;
@@ -191,110 +263,158 @@ const StylistTab: React.FC<Props> = ({
               <button
                 key={persona.id}
                 onClick={() => setContext(persona.id)}
-                className={`flex-shrink-0 w-20 h-14 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center snap-center relative ${
+                className={`flex-shrink-0 w-24 h-16 rounded-2xl border-2 snap-center flex flex-col items-center justify-center relative outline-none transition-all duration-500 transform-gpu ${
                   isActive 
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md scale-105 z-10' 
-                    : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-50'
+                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-110 z-10 animate-[bounce_0.4s_cubic-bezier(0.34,1.56,0.64,1)]' 
+                    : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-100 active:scale-95'
                 }`}
               >
-                <div className={`p-1 rounded-lg mb-0.5 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
-                  <Icon className={`w-3 h-3 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                <div className={`p-1.5 rounded-xl mb-1 transition-colors duration-300 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
                 </div>
                 <div className="text-center flex flex-col px-1 leading-none">
-                  <span className={`text-[7px] font-black uppercase tracking-tight ${isActive ? 'text-white' : 'text-gray-900'}`}>{persona.name}</span>
+                  <span className={`text-[8px] font-black uppercase tracking-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                    {persona.name}
+                  </span>
                 </div>
                 {isActive && (
-                   <div className="absolute -top-1 -right-1">
-                     <div className="bg-white rounded-full p-0.5 shadow-sm border border-indigo-100">
-                       <Check className="w-1.5 h-1.5 text-indigo-600 stroke-[5px]" />
+                   <div className="absolute -top-1.5 -right-1.5 animate-in zoom-in duration-300">
+                     <div className="bg-white rounded-full p-0.5 shadow-md border border-indigo-100">
+                       <Check className="w-2 h-2 text-indigo-600 stroke-[5px]" />
                      </div>
                    </div>
                 )}
               </button>
             );
           })}
+          
+          <div className="flex-shrink-0 w-2 snap-center" />
         </div>
       </div>
 
-      {error && <div className="p-2 bg-red-50 text-red-500 rounded-xl text-[8px] font-black uppercase border border-red-100">{error}</div>}
+      {error && (
+        <div className="mx-1 p-3 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase border border-red-100 flex items-center gap-2">
+          <X className="w-3 h-3" />
+          {error}
+        </div>
+      )}
 
-      {/* Compact Verdict Card with Integrated Location Folding */}
+      {/* Verdict Card with Enhanced Integrated Location & Typeahead */}
       {currentOutfit && weather && (
         <div className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ${loading ? 'opacity-50 grayscale-[0.5]' : 'opacity-100 animate-in slide-in-from-bottom-2'}`}>
-          <div className="p-5 space-y-3">
+          <div className="p-6 space-y-4">
             <div className="flex justify-between items-start">
               <div className="flex flex-col gap-1.5 flex-1">
-                <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest leading-none">
-                  Stylist Verdict
+                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] leading-none mb-1">
+                  STYLIST VERDICT
                 </span>
                 
-                {/* Integrated Location Toggle */}
+                {/* Location Selector/Search Container */}
                 <div className="relative">
                   {!isLocationExpanded ? (
                     <button 
-                      onClick={() => setIsLocationExpanded(true)}
-                      className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100 hover:border-indigo-200 transition-all active:scale-95 group"
+                      onClick={() => {
+                        setIsLocationExpanded(true);
+                        setLocationInput(weather.location);
+                      }}
+                      className="flex items-center gap-2 bg-gray-50 px-3.5 py-2.5 rounded-xl border border-gray-100 hover:border-indigo-200 transition-all active:scale-95 group"
                     >
-                      <MapPin className="w-2.5 h-2.5 text-gray-400 group-hover:text-indigo-500" />
-                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                      <span className="text-[12px] font-black text-gray-700 uppercase tracking-tight">
                         {weather.location}
                       </span>
-                      <ChevronDown className="w-2.5 h-2.5 text-gray-300" />
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-300" />
                     </button>
                   ) : (
-                    <form onSubmit={handleGenerate} className="flex gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-2.5 h-2.5" />
-                        <input
-                          type="text"
-                          autoFocus
-                          value={locationInput}
-                          onChange={(e) => setLocationInput(e.target.value)}
-                          placeholder="Search..."
-                          className="w-full pl-7 pr-2 py-1.5 bg-white border border-indigo-200 rounded-lg outline-none text-[11px] font-black text-black shadow-inner"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsLocationExpanded(false)}
-                        className="p-1.5 bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"
-                      >
-                         <ChevronDown className="w-3 h-3 rotate-180" />
-                      </button>
-                    </form>
+                    <div className="space-y-1 animate-in fade-in zoom-in-95 duration-200 z-50 relative">
+                      <form onSubmit={handleGenerate} className="flex gap-1">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 w-3.5 h-3.5" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={locationInput}
+                            onChange={handleInputChange}
+                            placeholder="Type a city..."
+                            className="w-full pl-9 pr-8 py-3 bg-white border-2 border-indigo-600 rounded-xl outline-none text-[13px] font-black text-black shadow-lg"
+                          />
+                          {locationInput && (
+                            <button 
+                              type="button" 
+                              onClick={() => setLocationInput('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsLocationExpanded(false)}
+                          className="px-2.5 bg-gray-100 rounded-xl text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                           <ChevronDown className="w-4 h-4 rotate-180" />
+                        </button>
+                      </form>
+
+                      {/* Typeahead Suggestions Dropdown */}
+                      {(suggestions.length > 0 || isSearchingSuggestions) && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden z-[60]">
+                          {isSearchingSuggestions && (
+                            <div className="p-4 flex items-center justify-center">
+                              <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                            </div>
+                          )}
+                          {suggestions.map((city, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => selectCity(city)}
+                              className="w-full px-5 py-4 text-left hover:bg-indigo-50 flex flex-col border-b border-gray-50 last:border-none transition-colors"
+                            >
+                              <span className="text-[12px] font-black text-gray-900 uppercase">{city.name}</span>
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                {city.admin1 ? `${city.admin1}, ` : ''}{city.country}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
-              <Sparkles className={`w-4 h-4 text-indigo-500 shrink-0 ${loading ? 'animate-pulse' : ''}`} />
+              <Sparkles className={`w-5 h-5 text-indigo-500 shrink-0 mt-1 ${loading ? 'animate-pulse' : ''}`} />
             </div>
             
-            <div className="space-y-2 pt-1 border-t border-gray-50 mt-1">
-              <OutfitSmallItem label="Core" value={currentOutfit.baseLayer} />
-              <OutfitSmallItem label="Shell" value={currentOutfit.outerwear} />
-              <OutfitSmallItem label="Step" value={currentOutfit.footwear} />
+            <div className="space-y-3.5 pt-3 border-t border-gray-50">
+              <OutfitSmallItem label="CORE" value={currentOutfit.baseLayer} />
+              <OutfitSmallItem label="SHELL" value={currentOutfit.outerwear} />
+              <OutfitSmallItem label="STEP" value={currentOutfit.footwear} />
             </div>
 
             <div className="pt-2">
-              <p className="text-[10px] text-gray-500 font-medium leading-relaxed italic opacity-80 border-l-2 border-indigo-50 pl-2">
+              <p className="text-[11px] text-gray-500 font-medium leading-relaxed italic opacity-90 border-l-2 border-indigo-100 pl-4">
                 "{currentOutfit.proTip}"
               </p>
             </div>
 
-            <button
-              onClick={() => onTabChange(AppTab.VISUALIZE)}
-              disabled={loading}
-              className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-gray-100 disabled:bg-gray-300"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              Visualize Look
-            </button>
+            <div className="pt-2">
+               <button
+                onClick={() => onTabChange(AppTab.VISUALIZE)}
+                disabled={loading}
+                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-gray-100 disabled:bg-gray-300 border border-black"
+              >
+                <Camera className="w-4 h-4" />
+                VISUALIZE LOOK
+              </button>
+            </div>
           </div>
 
           {outfitImage && (
             <div className="aspect-[3/4] relative group border-t border-gray-50">
               <img src={outfitImage} alt="Visual" className="w-full h-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-5 flex justify-end">
-                 <a href={outfitImage} download className="p-3 bg-white rounded-xl text-indigo-600 shadow-2xl active:scale-90 transition-all"><Download className="w-5 h-5" /></a>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-6 flex justify-end">
+                 <a href={outfitImage} download className="p-4 bg-white rounded-2xl text-indigo-600 shadow-2xl active:scale-90 transition-all"><Download className="w-6 h-6" /></a>
               </div>
             </div>
           )}
@@ -305,9 +425,9 @@ const StylistTab: React.FC<Props> = ({
 };
 
 const OutfitSmallItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
-  <div className="flex gap-3 items-start">
-    <span className="w-10 text-[7px] font-black text-indigo-300 uppercase mt-0.5 tracking-tighter shrink-0">{label}</span>
-    <p className="flex-1 text-[11px] font-black text-gray-900 leading-tight">{value}</p>
+  <div className="flex gap-5 items-start">
+    <span className="w-14 text-[9px] font-black text-indigo-400 uppercase mt-1 tracking-widest shrink-0">{label}</span>
+    <p className="flex-1 text-[13px] font-black text-gray-900 leading-tight tracking-tight">{value}</p>
   </div>
 );
 
