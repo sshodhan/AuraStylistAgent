@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OutfitSuggestion, WeatherData, TempUnit, AppTab } from '../types';
-import { generateOutfitImages } from '../services/geminiService';
-import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown } from 'lucide-react';
+import { generateOutfitImages, editImage } from '../services/geminiService';
+import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand } from 'lucide-react';
 
 interface Props {
   outfit: OutfitSuggestion | null;
@@ -20,6 +20,12 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
   const [error, setError] = useState<string | null>(null);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [isHubExpanded, setIsHubExpanded] = useState(true);
+  
+  // Edit State
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +51,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
 
     setLoading(true);
     setError(null);
-    // Auto-collapse hub to focus on results
+    setEditingIndex(null);
     setIsHubExpanded(false);
 
     try {
@@ -60,10 +66,28 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       } else {
         setError("Rendering failed. Verify your API key status.");
       }
-      // Re-expand on error so user can adjust
       setIsHubExpanded(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplyEdit = async (index: number) => {
+    if (!imageUrls || !editPrompt.trim()) return;
+    
+    setIsEditing(true);
+    setError(null);
+    try {
+      const editedUrl = await editImage(imageUrls[index], editPrompt);
+      const newUrls = [...imageUrls];
+      newUrls[index] = editedUrl;
+      onImagesUpdate(newUrls);
+      setEditPrompt("");
+      setEditingIndex(null);
+    } catch (err: any) {
+      setError("Magic Retouch failed. Try a different prompt.");
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -105,7 +129,6 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
 
       {/* Collapsible Personalization Hub */}
       <div className={`relative group overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 transition-all duration-500 ${isHubExpanded ? 'p-6' : 'p-4'}`}>
-        {/* Header/Toggle Area */}
         <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsHubExpanded(!isHubExpanded)}>
           <div className="flex items-center gap-2">
             <Zap className={`w-4 h-4 text-indigo-300 transition-transform duration-500 ${isHubExpanded ? 'rotate-0' : 'rotate-12'}`} />
@@ -245,7 +268,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
         </div>
       )}
 
-      {/* Lookbook Gallery */}
+      {/* Gallery Section */}
       <div className="space-y-6">
         {loading ? (
           <div className="aspect-[3/4] bg-gray-50 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-6">
@@ -265,25 +288,81 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
             </div>
           </div>
         ) : imageUrls ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {imageUrls.map((url, idx) => (
-              <div key={idx} className="relative aspect-[3/4] bg-gray-50 rounded-[3rem] overflow-hidden border border-gray-100 shadow-lg animate-in zoom-in-95 duration-500">
-                <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-8 flex justify-between items-end">
-                  <div className="text-white">
-                    <p className="text-[8px] font-black opacity-60 uppercase tracking-widest mb-1">
-                      {userPhoto ? "Personalized Look" : "Look Details"}
-                    </p>
-                    <p className="text-xs font-bold leading-tight line-clamp-2 max-w-[200px]">{outfit.outerwear}</p>
+              <div key={idx} className="space-y-3">
+                <div className="relative aspect-[3/4] bg-gray-50 rounded-[3rem] overflow-hidden border border-gray-100 shadow-lg animate-in zoom-in-95 duration-500">
+                  <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
+                  
+                  {/* Overlay Controls */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-8 flex justify-between items-end">
+                    <div className="text-white">
+                      <p className="text-[8px] font-black opacity-60 uppercase tracking-widest mb-1">
+                        {userPhoto ? "Personalized Look" : "Look Details"}
+                      </p>
+                      <p className="text-xs font-bold leading-tight line-clamp-2 max-w-[160px]">{outfit.outerwear}</p>
+                    </div>
+                    <div className="flex gap-2">
+                       <button 
+                        onClick={() => setEditingIndex(editingIndex === idx ? null : idx)}
+                        className={`p-4 rounded-2xl shadow-2xl active:scale-90 transition-all ${editingIndex === idx ? 'bg-indigo-600 text-white' : 'bg-white/20 backdrop-blur-md text-white border border-white/20'}`}
+                      >
+                        <Wand2 className="w-5 h-5" />
+                      </button>
+                      <a 
+                        href={url} 
+                        download={`aura-look-${idx+1}.png`}
+                        className="p-4 bg-white rounded-2xl text-indigo-600 shadow-2xl active:scale-90 transition-all"
+                      >
+                        <Download className="w-5 h-5" />
+                      </a>
+                    </div>
                   </div>
-                  <a 
-                    href={url} 
-                    download={`aura-look-${idx+1}.png`}
-                    className="p-4 bg-white rounded-2xl text-indigo-600 shadow-2xl active:scale-90 transition-all"
-                  >
-                    <Download className="w-5 h-5" />
-                  </a>
                 </div>
+
+                {/* Magic Retouch Interface */}
+                <AnimatePresence>
+                  {editingIndex === idx && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="bg-indigo-50 border border-indigo-100 p-4 rounded-[2rem] space-y-3"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Wand className="w-3.5 h-3.5 text-indigo-600" />
+                        <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Magic Retouch</h4>
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="text"
+                          value={editPrompt}
+                          onChange={(e) => setEditPrompt(e.target.value)}
+                          placeholder="e.g. 'Add a retro filter' or 'Make it dusk'"
+                          className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-[11px] font-medium outline-none pr-12 shadow-sm focus:ring-2 focus:ring-indigo-600/20"
+                        />
+                        <button 
+                          onClick={() => handleApplyEdit(idx)}
+                          disabled={isEditing || !editPrompt.trim()}
+                          className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 transition-colors"
+                        >
+                          {isEditing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {["Retro filter", "BW photo", "Golden hour", "Cyberpunk", "Remove background"].map(suggestion => (
+                          <button
+                            key={suggestion}
+                            onClick={() => setEditPrompt(suggestion)}
+                            className="text-[8px] font-black uppercase tracking-wider text-indigo-600 bg-white border border-indigo-100 px-3 py-1.5 rounded-full hover:bg-indigo-600 hover:text-white transition-all"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>
@@ -300,7 +379,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       
       <div className="flex items-center gap-2 text-[8px] text-gray-400 font-black uppercase tracking-widest px-4">
         <AlertCircle className="w-3 h-3" />
-        <span>Paid API Project Required for lookbook renders</span>
+        <span>Paid API Project Required for high-res lookbook renders</span>
       </div>
     </div>
   );

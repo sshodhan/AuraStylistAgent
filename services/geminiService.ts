@@ -165,6 +165,41 @@ export const generateOutfitImages = async (
   return Promise.all(subjects.map(subject => generateOutfitImage(outfit, weather, size, unit, subject)));
 };
 
+// Edits an image based on a text prompt using Gemini 2.5 Flash Image
+export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [
+        {
+          inlineData: {
+            data: base64Image.split(',')[1] || base64Image,
+            mimeType: 'image/jpeg',
+          },
+        },
+        { text: prompt },
+      ],
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: "3:4"
+      }
+    }
+  });
+
+  if (!response.candidates?.[0]?.content?.parts) {
+    throw new Error("Editing failed.");
+  }
+
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return `data:image/png;base64,${part.inlineData.data}`;
+    }
+  }
+  throw new Error("No edited image data found.");
+};
+
 // Generates a cinematic hero image of the current weather conditions
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
