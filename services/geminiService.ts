@@ -79,12 +79,23 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
   return response.text || "Your daily style brief is ready.";
 };
 
-// Fix: Added generateOutfitImage to resolve missing export error
-export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F', subject: string = "a stylish person"): Promise<string> => {
+// Generates a singular outfit image, optionally using a user reference image
+export const generateOutfitImage = async (
+  outfit: OutfitSuggestion, 
+  weather: WeatherData, 
+  size: "1K" | "2K" | "4K" = "1K", 
+  unit: TempUnit = 'F', 
+  subject: string = "a stylish person",
+  userImage?: string // base64 data
+): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
-  const prompt = `High-fashion editorial photo of ${subject} in ${weather.location}. 
+  const subjectDescription = userImage 
+    ? `this specific person shown in the reference image, realistically dressed in the new outfit while maintaining their likeness`
+    : subject;
+
+  const prompt = `High-fashion editorial photo of ${subjectDescription} in ${weather.location}. 
   STYLING VERDICT TO FOLLOW EXACTLY:
   - Base: ${outfit.baseLayer}
   - Outerwear: ${outfit.outerwear}
@@ -93,10 +104,21 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
   
   ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
   
+  const parts: any[] = [{ text: prompt }];
+  
+  if (userImage) {
+    parts.push({
+      inlineData: {
+        data: userImage.split(',')[1] || userImage, // Remove prefix if exists
+        mimeType: 'image/jpeg'
+      }
+    });
+  }
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
     contents: {
-      parts: [{ text: prompt }]
+      parts: parts
     },
     config: {
       imageConfig: {
@@ -119,14 +141,27 @@ export const generateOutfitImage = async (outfit: OutfitSuggestion, weather: Wea
 };
 
 // Generates multiple variations for lookbook
-export const generateOutfitImages = async (outfit: OutfitSuggestion, weather: WeatherData, size: "1K" | "2K" | "4K" = "1K", unit: TempUnit = 'F'): Promise<string[]> => {
+export const generateOutfitImages = async (
+  outfit: OutfitSuggestion, 
+  weather: WeatherData, 
+  size: "1K" | "2K" | "4K" = "1K", 
+  unit: TempUnit = 'F',
+  userImage?: string
+): Promise<string[]> => {
+  // If user provides an image, we focus on personalizing it specifically
+  if (userImage) {
+    const p1 = generateOutfitImage(outfit, weather, size, unit, "personalized look", userImage);
+    const p2 = generateOutfitImage(outfit, weather, size, unit, "alternate personalized look", userImage);
+    const p3 = generateOutfitImage(outfit, weather, size, unit, "stylized personalized look", userImage);
+    return Promise.all([p1, p2, p3]);
+  }
+
   const subjects = [
-    "a stylish man",
-    "a stylish woman",
-    "two people together"
+    "a stylish woman wearing a feminine, high-fashion interpretation of the outfit with elegant styling",
+    "a stylish man wearing a masculine, high-fashion version of the outfit",
+    "a diverse biracial pair of people (including a person of color) together in high-fashion coordinated looks"
   ];
 
-  // Run variations in parallel using the singular helper
   return Promise.all(subjects.map(subject => generateOutfitImage(outfit, weather, size, unit, subject)));
 };
 

@@ -63,6 +63,8 @@ interface Props {
   onOutfitImageUpdate: (img: string | null) => void;
   currentOutfit: OutfitSuggestion | null;
   onTabChange: (tab: AppTab) => void;
+  styleContext: string;
+  onStyleContextUpdate: (context: string) => void;
 }
 
 interface CitySuggestion {
@@ -83,12 +85,13 @@ const StylistTab: React.FC<Props> = ({
   onHeroUpdate,
   onOutfitImageUpdate,
   currentOutfit,
-  onTabChange
+  onTabChange,
+  styleContext,
+  onStyleContextUpdate
 }) => {
   const [locationInput, setLocationInput] = useState('Seattle');
   const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
   const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
-  const [context, setContext] = useState('casual');
   const [hoveredPersona, setHoveredPersona] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +139,7 @@ const StylistTab: React.FC<Props> = ({
       onWeatherUpdate(weatherData);
 
       const [suggestion, hero] = await Promise.all([
-        getOutfitSuggestion(weatherData, context, unit),
+        getOutfitSuggestion(weatherData, styleContext, unit),
         generateWeatherHeroImage(weatherData, unit).catch(() => null)
       ]);
 
@@ -165,7 +168,7 @@ const StylistTab: React.FC<Props> = ({
       onWeatherUpdate(weatherData);
       
       const [suggestion, hero] = await Promise.all([
-        getOutfitSuggestion(weatherData, context, unit),
+        getOutfitSuggestion(weatherData, styleContext, unit),
         generateWeatherHeroImage(weatherData, unit).catch(() => null)
       ]);
       
@@ -193,11 +196,12 @@ const StylistTab: React.FC<Props> = ({
     }
   }, [unit, onOutfitUpdate, onOutfitImageUpdate]);
 
-  useEffect(() => {
+  const handlePersonaClick = (id: string) => {
+    onStyleContextUpdate(id);
     if (weather) {
-      refreshSuggestion(weather, context);
+      refreshSuggestion(weather, id);
     }
-  }, [context]);
+  };
 
   useEffect(() => {
     if (!currentOutfit && !weather) {
@@ -266,7 +270,7 @@ const StylistTab: React.FC<Props> = ({
         >
           {STYLE_PERSONAS.map((persona, index) => {
             const Icon = persona.icon;
-            const isActive = context === persona.id;
+            const isActive = styleContext === persona.id;
             const isHovered = hoveredPersona === persona.id;
 
             return (
@@ -278,7 +282,7 @@ const StylistTab: React.FC<Props> = ({
                 className="flex-shrink-0 snap-center relative"
               >
                 <button
-                  onClick={() => setContext(persona.id)}
+                  onClick={() => handlePersonaClick(persona.id)}
                   onMouseEnter={() => setHoveredPersona(persona.id)}
                   onMouseLeave={() => setHoveredPersona(null)}
                   className={`relative w-20 h-20 rounded-3xl border-2 flex flex-col items-center justify-center outline-none transition-all duration-300 transform-gpu ${

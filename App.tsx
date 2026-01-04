@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [weatherHero, setWeatherHero] = useState<string | null>(null);
   const [outfitImages, setOutfitImages] = useState<string[] | null>(null);
   const [unit, setUnit] = useState<TempUnit>('F');
+  const [styleContext, setStyleContext] = useState<string>('casual');
   const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "YOU");
 
   // Sync user name from local storage periodically or when settings might change it
@@ -114,6 +115,8 @@ const App: React.FC = () => {
                 onOutfitImageUpdate={(img) => setOutfitImages(img ? [img] : null)}
                 currentOutfit={outfit} 
                 onTabChange={setActiveTab}
+                styleContext={styleContext}
+                onStyleContextUpdate={setStyleContext}
               />
             )}
             {activeTab === AppTab.VOICE && <VoiceTab weather={weather} unit={unit} />}
