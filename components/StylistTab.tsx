@@ -378,7 +378,14 @@ const StylistTab: React.FC<Props> = ({
               </p>
             </div>
             <button 
-              onClick={() => onFitCheck?.() || onTabChange(AppTab.VISUALIZE)} 
+              // Fix truthiness check error by using explicit block instead of || 
+              onClick={() => {
+                if (onFitCheck) {
+                  onFitCheck();
+                } else {
+                  onTabChange(AppTab.VISUALIZE);
+                }
+              }} 
               className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-lg active:scale-95 group transition-all"
             >
               <Camera className="w-4 h-4 group-hover:rotate-12 transition-transform" />
