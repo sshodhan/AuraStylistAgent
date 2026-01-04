@@ -1,6 +1,15 @@
 
 export type TempUnit = 'C' | 'F';
 
+export interface UserProfile {
+  name: string;
+  email: string;
+  styleArchetype: string; // e.g., "Dark Academia", "Minimalist Tech", "Vintage Boho"
+  preferredPalette: string[]; // e.g., ["#2D3436", "#636E72"]
+  bodyType?: string;
+  seasonalVibe?: string;
+}
+
 export interface WeatherData {
   temp: number; // Stored in Celsius
   precip: number;
@@ -15,8 +24,7 @@ export interface OutfitSuggestion {
   footwear: string;
   proTip: string;
   styleReasoning: string;
-  weatherStory: string; // New field for the atmospheric narrative
-  // New Lifestyle Fields
+  weatherStory: string;
   activity: string;
   coffeeSpot: string;
   storeType: string;

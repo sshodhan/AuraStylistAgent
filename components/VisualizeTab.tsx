@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { OutfitSuggestion, WeatherData, TempUnit, AppTab } from '../types';
-import { generateOutfitImages, editImage } from '../services/geminiService';
-import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand, Globe } from 'lucide-react';
+import { OutfitSuggestion, WeatherData, TempUnit, AppTab, UserProfile } from '../types';
+import { generateOutfitImages, editImage, generateVeoVideo } from '../services/geminiService';
+// Added Shirt to imports from lucide-react to resolve the "Cannot find name 'Shirt'" error.
+import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand, Film, Play, Pause, RotateCw, Mic, Volume2, Shirt } from 'lucide-react';
 
 interface Props {
   outfit: OutfitSuggestion | null;
@@ -21,20 +22,100 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
   const [error, setError] = useState<string | null>(null);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [isHubExpanded, setIsHubExpanded] = useState(true);
-  const [pulseInput, setPulseInput] = useState(false);
   
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editPrompt, setEditPrompt] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoStatus, setVideoStatus] = useState("");
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [voicePrompt, setVoicePrompt] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (autoTrigger && outfit && weather && !imageUrls && !loading) {
       handleGenerate();
     }
   }, [autoTrigger, outfit, weather, imageUrls]);
+
+  // Voice Recognition Setup
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      try {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setVoicePrompt(transcript);
+          setIsRecording(false);
+        };
+        recognitionRef.current.onerror = () => setIsRecording(false);
+        recognitionRef.current.onend = () => setIsRecording(false);
+      } catch (err) {
+        console.warn("Speech Recognition failed to initialize", err);
+      }
+    }
+  }, []);
+
+  const handleToggleRecording = () => {
+    if (!recognitionRef.current) {
+      setError("Speech recognition is not supported in this browser.");
+      return;
+    }
+    
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      setVoicePrompt("");
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Recording start error", err);
+        setIsRecording(false);
+      }
+    }
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!imageUrls || imageUrls.length === 0) return;
+    
+    setVideoLoading(true);
+    setError(null);
+    setVideoUrl(null);
+    setShowVideoModal(true);
+    
+    const archetype = localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist";
+
+    // RICH STYLIST PROMPT: Emphasizing Full-Body Height and Portrait Composition
+    const basePrompt = `
+      HIGH-END EDITORIAL FASHION CINEMATOGRAPHY.
+      SUBJECT: A full-body shot of the person in the provided reference images.
+      STYLE ARCHETYPE: ${archetype}.
+      COMPOSITION: Vertical portrait shot, full height visible from head to toe. No cropping.
+      OUTFIT FOCUS: Seamless transition showing the textures of the ${outfit?.outerwear}, ${outfit?.baseLayer}, and ${outfit?.footwear}.
+      VIBE: ${outfit?.styleReasoning}.
+      ATMOSPHERE: ${outfit?.weatherStory}.
+      MOTION: A professional high-fashion runway walk towards the camera. 
+      ${voicePrompt ? `USER COMMAND: ${voicePrompt}` : ''}
+    `.trim();
+
+    try {
+      const url = await generateVeoVideo(imageUrls, basePrompt, (status) => setVideoStatus(status));
+      setVideoUrl(url);
+    } catch (err: any) {
+      setError(err.message || "Veo animation failed.");
+      setShowVideoModal(false);
+    } finally {
+      setVideoLoading(false);
+      setVideoStatus("");
+    }
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,61 +128,41 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
 
   const handleGenerate = async () => {
     if (!outfit || !weather) return;
-    
     setLoading(true);
     setError(null);
-    setEditingIndex(null);
     setIsHubExpanded(false);
 
     try {
-      // Check for key before proceeding
-      if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
-        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-        if (!hasKey) {
-           await (window as any).aistudio.openSelectKey();
-        }
-      }
-
       const urls = await generateOutfitImages(outfit, weather, size, unit, userPhoto || undefined);
       onImagesUpdate(urls);
     } catch (err: any) {
-      console.error("UI CATCH: Image Generation Failed", err);
-      
-      const msg = err.message || "";
-      if (msg.includes("Requested entity was not found") || msg.includes("404")) {
-        setError("BILLING ERROR: This model (Gemini 3 Pro) requires an API key from a Paid Google Cloud project. Please check ai.google.dev/billing.");
-      } else if (msg.includes("timeout") || msg.includes("fetch")) {
-        setError("NETWORK ERROR: The generation timed out. If you are on a Vercel Hobby plan, try again with a 1K size setting.");
-      } else {
-        setError(`RENDER FAILED: ${msg.slice(0, 100)}... Check browser console for details.`);
-      }
-      setIsHubExpanded(true);
+      setError(err.message || "Generation failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApplyEdit = async (index: number) => {
-    if (!imageUrls || !editPrompt.trim()) return;
-    setIsEditing(true);
-    setError(null);
-    try {
-      const editedUrl = await editImage(imageUrls[index], editPrompt);
-      const newUrls = [...imageUrls];
-      newUrls[index] = editedUrl;
-      onImagesUpdate(newUrls);
-      setEditPrompt("");
-      setEditingIndex(null);
-    } catch (err: any) {
-      setError("Magic Retouch failed. Try a different prompt.");
-    } finally {
-      setIsEditing(false);
-    }
-  };
-
-  if (!outfit) return null;
-
-  const variationsLabel = ["Modernist", "Avant-Garde", "Urban Heritage"];
+  if (!outfit) {
+    return (
+      <div className="min-h-[60dvh] flex flex-col items-center justify-center p-8 space-y-6 text-center animate-in fade-in duration-500">
+        <div className="bg-indigo-50 p-6 rounded-[2.5rem]">
+          <Shirt className="w-12 h-12 text-indigo-400" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">No Outfit Selection</h2>
+          <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-[240px]">
+            Head back to the Stylist tab to get your professional weather-aware recommendation first.
+          </p>
+        </div>
+        <button 
+          onClick={() => onTabChange(AppTab.STYLIST)}
+          className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+        >
+          Go to Stylist
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-12 animate-in fade-in duration-500">
@@ -120,11 +181,6 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
           <div className="flex items-center gap-2">
             <Zap className={`w-4 h-4 text-indigo-300 transition-transform ${isHubExpanded ? 'rotate-0' : 'rotate-12'}`} />
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100">Virtual Mirror</h3>
-            {!isHubExpanded && userPhoto && (
-              <div className="w-5 h-5 rounded-full overflow-hidden border border-white/40 ml-1">
-                <img src={userPhoto} alt="Ref" className="w-full h-full object-cover" />
-              </div>
-            )}
           </div>
           <ChevronDown className={`w-4 h-4 text-white transition-transform ${isHubExpanded ? 'rotate-180' : 'rotate-0'}`} />
         </div>
@@ -133,14 +189,12 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <div className="space-y-4 pt-4 text-white">
                 <h2 className="text-lg font-black tracking-tight">Personalize Your Look</h2>
-                <p className="text-[10px] opacity-80 font-medium leading-relaxed max-w-[240px]">Map Aura's styling verdicts directly onto your photo using Gemini 3 Pro reasoning.</p>
                 <div className="pt-2">
                   {userPhoto ? (
                     <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/20">
                       <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><img src={userPhoto} alt="Ref" className="w-full h-full object-cover" /></div>
                       <div className="flex-1">
                         <p className="text-[9px] font-black uppercase text-indigo-100">Identity Active</p>
-                        <p className="text-[8px] opacity-60">Personalized Mode Engaged</p>
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); setUserPhoto(null); }} className="p-1.5"><X className="w-4 h-4 text-white" /></button>
                     </div>
@@ -159,101 +213,176 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       </div>
 
       <div className="bg-white p-5 rounded-[2.5rem] border border-gray-100 space-y-4 mx-1 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-black flex items-center gap-2 text-gray-900 uppercase tracking-widest">Style Lab</h2>
-          <div className="bg-indigo-50 px-2 py-1 rounded-md"><span className="text-[8px] font-black text-indigo-600 uppercase">Gemini 3 Pro</span></div>
-        </div>
-        
-        {/* Controls for Size - useful for debugging timeouts */}
-        <div className="flex bg-gray-50 p-1 rounded-xl gap-1">
-          {(["1K", "2K", "4K"] as const).map((s) => (
-            <button key={s} onClick={() => setSize(s)} className={`flex-1 py-1.5 rounded-lg text-[8px] font-black transition-all ${size === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>
-              {s}
-            </button>
-          ))}
-        </div>
-
         <button onClick={handleGenerate} disabled={loading} className={`w-full py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 active:scale-95 shadow-xl ${userPhoto ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-gray-900 text-white shadow-gray-200'} disabled:opacity-50`}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{userPhoto ? "Personalized Fit Check" : "Generate Range Brief"}</>}
         </button>
+        
+        <div className="bg-indigo-50/50 p-4 rounded-[2rem] border border-indigo-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Veo Motion Command</span>
+            <button onClick={handleToggleRecording} className={`p-2 rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-indigo-600 shadow-sm'}`}>
+              {isRecording ? <Mic className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+          <input 
+            type="text" 
+            value={voicePrompt} 
+            onChange={(e) => setVoicePrompt(e.target.value)}
+            placeholder={isRecording ? "Listening..." : "Optional: Add motion command via voice or text"}
+            className="w-full bg-transparent text-[11px] font-bold text-indigo-900 placeholder:text-indigo-300 outline-none border-b border-indigo-100 pb-1"
+          />
+        </div>
       </div>
 
       {error && (
-        <div className="bg-rose-50 text-rose-600 p-5 rounded-[2rem] text-[10px] font-black uppercase flex flex-col gap-3 border border-rose-100 mx-1 shadow-sm animate-in shake-in">
+        <div className="bg-rose-50 text-rose-600 p-5 rounded-[2rem] text-[10px] font-black uppercase flex flex-col gap-3 border border-rose-100 mx-1 shadow-sm">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <p className="flex-1 leading-relaxed tracking-tight">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-[8px] underline text-rose-400 self-end">Dismiss</button>
         </div>
       )}
 
+      {/* Main Fit Previews */}
       <div className="space-y-12">
         {loading ? (
           <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-            <div className="text-center px-12">
-              <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Synthesizing Imagery...</p>
-              <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">Aura is rendering high-fidelity looks for ${weather!.location}...</p>
-            </div>
+            <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Synthesizing Imagery...</p>
           </div>
         ) : imageUrls ? (
-          <div className="space-y-12 px-1">
+          <div className="space-y-8 px-1">
+            <div className="bg-gray-900 p-8 rounded-[3.5rem] flex flex-col items-center gap-6 shadow-2xl border border-white/5">
+                <div className="flex -space-x-4">
+                  {imageUrls.slice(0, 3).map((url, i) => (
+                    <div key={i} className="w-16 h-16 rounded-2xl border-2 border-gray-900 overflow-hidden shadow-lg rotate-3 odd:-rotate-3">
+                      <img src={url} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Animate Your Fit</h3>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Uses previews to synthesize portrait motion</p>
+                </div>
+                <button 
+                  onClick={handleGenerateVideo}
+                  disabled={videoLoading}
+                  className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+                >
+                  <Film className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Generate Runway Video</span>
+                </button>
+            </div>
+
             {imageUrls.map((url, idx) => (
-              <div key={idx} className="space-y-4">
-                <div className="relative aspect-[3/4] bg-gray-50 rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl animate-in zoom-in-95">
-                  <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
-                  
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-10 flex justify-between items-end">
-                    <div className="text-white space-y-1.5">
-                      <p className="text-[8px] font-black uppercase tracking-[0.2em] opacity-80">Look Details</p>
-                      <h4 className="text-[15px] font-black leading-snug max-w-[180px] uppercase tracking-tighter">
-                        {outfit.outerwear.split(' ').slice(0, 3).join(' ')} + {outfit.baseLayer.split(' ').slice(0, 2).join(' ')}
-                      </h4>
-                      <div className="flex items-center gap-2 pt-1">
-                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                         <span className="text-[8px] font-black uppercase tracking-widest text-indigo-200">
-                           {userPhoto ? "Personalized Render" : `${variationsLabel[idx]} Vibe`}
-                         </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                       <button onClick={() => setEditingIndex(editingIndex === idx ? null : idx)} className={`p-4 rounded-2xl transition-all ${editingIndex === idx ? 'bg-indigo-600 text-white' : 'bg-white/10 backdrop-blur-md text-white border border-white/20'}`}>
-                        <Wand2 className="w-5 h-5" />
-                      </button>
-                      <a href={url} download={`aura-${idx+1}.png`} className="p-4 bg-white rounded-2xl text-indigo-600 shadow-xl active:scale-95 transition-all">
-                        <Download className="w-5 h-5" />
-                      </a>
-                    </div>
+              <div key={idx} className="relative aspect-[3/4] bg-gray-50 rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl group">
+                <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-10 flex justify-between items-end">
+                  <div className="text-white space-y-1.5">
+                    <h4 className="text-[15px] font-black leading-snug max-w-[180px] uppercase tracking-tighter">
+                      Fit Preview 0{idx + 1}
+                    </h4>
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={url} download={`aura-${idx+1}.png`} className="p-4 bg-white rounded-2xl text-indigo-600 shadow-xl active:scale-95 transition-all">
+                      <Download className="w-5 h-5" />
+                    </a>
                   </div>
                 </div>
-
-                <AnimatePresence>
-                  {editingIndex === idx && (
-                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-indigo-50 border border-indigo-100 p-6 rounded-[2.5rem] space-y-4 overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <Wand className="w-3.5 h-3.5 text-indigo-600" />
-                        <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Magic Retouch (2.5 Flash)</h4>
-                      </div>
-                      <div className="relative">
-                        <input type="text" value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="e.g. 'Add a rain effect' or 'Make it BW'" className="w-full bg-white border border-indigo-100 rounded-2xl px-5 py-4 text-xs font-medium outline-none pr-16 shadow-sm focus:ring-4 focus:ring-indigo-600/10" />
-                        <button onClick={() => handleApplyEdit(idx)} disabled={isEditing || !editPrompt.trim()} className="absolute right-2 top-2 bottom-2 px-4 bg-indigo-600 text-white rounded-xl">
-                          {isEditing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
             ))}
           </div>
         ) : (
           <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] flex flex-col items-center justify-center p-12 text-center space-y-4 opacity-40 border border-gray-100">
             <Camera className="w-10 h-10 text-gray-300" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-relaxed px-6">Render today's styling verdict into high-fidelity imagery.</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Render today's styling verdict into high-fidelity imagery.</p>
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showVideoModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-y-auto"
+          >
+            <button 
+              onClick={() => {
+                setShowVideoModal(false);
+                setVideoUrl(null);
+                setVideoLoading(false);
+                setVideoStatus("");
+              }}
+              className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 rounded-full text-white shadow-2xl z-[110] transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="w-full max-w-[400px] aspect-[9/16] bg-gray-900 rounded-[3rem] overflow-hidden shadow-2xl relative border border-white/10 my-auto">
+              {videoLoading ? (
+                <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8">
+                  <div className="relative">
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                      className="w-20 h-20 rounded-full border-t-4 border-indigo-500 border-r-4 border-transparent"
+                    />
+                    <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-indigo-400 animate-pulse" />
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-lg font-black text-white uppercase tracking-tighter">Dreaming Fit</p>
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">
+                      {videoStatus || "Initializing Aura Portrait Engine..."}
+                    </p>
+                  </div>
+                  <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 w-full">
+                    <p className="text-[9px] text-gray-400 font-medium italic leading-relaxed">
+                      "Aura is generating a full-body runway showcase. This takes ~2 minutes to ensure cinematic vertical fidelity."
+                    </p>
+                  </div>
+                </div>
+              ) : videoUrl ? (
+                <video 
+                  ref={videoRef}
+                  src={videoUrl} 
+                  autoPlay 
+                  loop 
+                  muted={false}
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center p-12 text-center space-y-4">
+                   <AlertCircle className="w-10 h-10 text-rose-500" />
+                   <p className="text-[10px] font-black text-white uppercase tracking-widest">Generation Stalled</p>
+                   <button onClick={handleGenerateVideo} className="px-6 py-3 bg-white text-black rounded-xl font-black text-[9px] uppercase tracking-widest">Retry Animation</button>
+                </div>
+              )}
+            </div>
+
+            {videoUrl && (
+              <div className="mt-6 flex gap-3 shrink-0">
+                <button 
+                  onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}
+                  className="px-6 py-4 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-2 shadow-xl active:scale-95 transition-all"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  Playback
+                </button>
+                <a 
+                  href={videoUrl} 
+                  download="aura-runway.mp4"
+                  className="px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                >
+                  Download HD
+                </a>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

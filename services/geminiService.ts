@@ -1,31 +1,120 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink } from "../types";
+import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile } from "../types";
 
 const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
 
-// Generates a comprehensive lifestyle itinerary based on weather
+const getUserProfile = (): UserProfile => {
+  return {
+    name: localStorage.getItem('aura_user_name') || "YOU",
+    email: localStorage.getItem('aura_email_address') || "",
+    styleArchetype: localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist",
+    preferredPalette: JSON.parse(localStorage.getItem('aura_palette') || '["Neutral Gray", "Deep Navy", "Pure White"]')
+  };
+};
+
+export const generateVeoVideo = async (
+  imageUrls: string[], 
+  prompt: string,
+  onStatusUpdate?: (status: string) => void
+): Promise<string> => {
+  if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
+    const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+    if (!hasKey) {
+      await (window as any).aistudio.openSelectKey();
+    }
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  onStatusUpdate?.("Initializing Veo Portrait Engine...");
+
+  try {
+    // To achieve 9:16 (Portrait), we use the 'image' (start frame) and 'lastFrame' (end frame) properties
+    // This provides a "taller" cinematic look preferred for fashion runway shots.
+    const startImage = imageUrls[0].split(',')[1] || imageUrls[0];
+    const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
+
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-generate-preview',
+      prompt: prompt,
+      image: {
+        imageBytes: startImage,
+        mimeType: 'image/png',
+      },
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: '9:16', // Switched to 9:16 for full-body fashion height
+        lastFrame: {
+          imageBytes: endImage,
+          mimeType: 'image/png',
+        }
+      }
+    });
+
+    onStatusUpdate?.("Synthesizing Style Motion...");
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      onStatusUpdate?.(getRandomReassuringMessage());
+      operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) throw new Error("Video generation failed to return a link.");
+
+    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    const blob = await videoResponse.blob();
+    return URL.createObjectURL(blob);
+  } catch (err: any) {
+    console.error("Veo Generation Error:", err);
+    if (err.message?.includes("Requested entity was not found")) {
+      await (window as any).aistudio.openSelectKey();
+      throw new Error("API Key reset required. Please select a paid project.");
+    }
+    throw err;
+  }
+};
+
+const getRandomReassuringMessage = () => {
+  const messages = [
+    "Refining fabric physics...",
+    "Balancing atmospheric lighting...",
+    "Rendering cinematic motion...",
+    "Stitching frames for elegance...",
+    "Finalizing urban backdrop...",
+    "Syncing motion to fit..."
+  ];
+  return messages[Math.floor(Math.random() * messages.length)];
+};
+
 export const getOutfitSuggestion = async (weather: WeatherData, context: string = "casual", unit: TempUnit = 'F'): Promise<OutfitSuggestion> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
+  const profile = getUserProfile();
   
   const prompt = `
     You are a professional fashion stylist and urban concierge. A client is in ${weather.location}.
     Weather: ${displayTemp}°${unit}, Precip: ${weather.precip}mm, Wind: ${weather.wind}km/h.
-    Client Context/Persona: "${context}"
+    Client Persona: "${context}"
+    
+    CRITICAL PERSONALIZATION:
+    - User's Signature Archetype: "${profile.styleArchetype}"
+    - Preferred Color Palette: ${profile.preferredPalette.join(', ')}
+    - User Name: ${profile.name}
 
     Suggest:
-    1. A 3-piece outfit (Base, Outerwear, Shoes).
-    2. A "Weather Story": A very short (2 sentences max), inspirational narrative about today's atmosphere and an activity the user should feel inspired to do. 
-    3. "Style Reasoning": Technical explanation of why this specific outfit works for the weather.
+    1. A 3-piece outfit (Base, Outerwear, Shoes) that strictly adheres to the ${profile.styleArchetype} aesthetic using colors from ${profile.preferredPalette.join(', ')}.
+    2. A "Weather Story": 2 sentences max. 
+    3. "Style Reasoning": Technical explanation of fabric choices and palette harmony.
     4. A "Fun Activity" optimized for this vibe.
     5. A "Coffee/Dining Vibe".
     6. "Store Type".
 
-    Style Rules:
-    - Breathable for high humidity (>80%).
-    - Shells for wind (>20km/h).
-    - Match everything to the "${context}" aesthetic.
+    Rules:
+    - If wind > 20km/h, prioritize structural outerwear.
+    - If temp > 25°C, prioritize linen and breathable silks.
+    - Personalize the response for ${profile.name}.
   `;
 
   try {
@@ -58,34 +147,6 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   }
 };
 
-// Generates an email digest content
-export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSuggestion, unit: TempUnit = 'F', userName: string = ''): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const displayTemp = convertTemp(weather.temp, unit);
-  
-  const prompt = `
-    Write a brief "Daily Styling Digest" for ${userName || 'Fashionista'}.
-    Location: ${weather.location}
-    Weather: ${displayTemp}°${unit}.
-    Look: ${outfit.outerwear} over ${outfit.baseLayer}.
-    Activity: ${outfit.activity}.
-    Vibe: ${outfit.coffeeSpot}.
-    Tip: ${outfit.proTip}
-  `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      temperature: 0.7,
-      maxOutputTokens: 500,
-    }
-  });
-
-  return response.text || "Your daily style brief is ready.";
-};
-
-// Generates a singular outfit image with deep contextual steering
 export const generateOutfitImage = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -98,49 +159,35 @@ export const generateOutfitImage = async (
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
+  const profile = getUserProfile();
   
   const prompt = `High-end editorial fashion photography. 
-  SUBJECT: ${userImage ? 'the person provided in the reference photo' : subject}.
-  LOCATION: An atmospheric street in ${weather.location}, specifically near a ${outfit.coffeeSpot}.
-  ACTIVITY: The subject is ${outfit.activity}.
-  LIGHTING: Cinematic lighting matching ${displayTemp}°${unit} weather conditions.
-  STYLE: ${visualVariation}, aesthetic matching ${outfit.styleReasoning}.
-  PALETTE: ${paletteHint}.
+  SUBJECT: ${userImage ? 'the person in the reference' : subject}.
+  THEME: ${profile.styleArchetype}.
+  PALETTE: ${profile.preferredPalette.join(', ')}.
+  LOCATION: ${weather.location} street scene.
   OUTFIT: ${outfit.baseLayer}, ${outfit.outerwear}, ${outfit.footwear}.
-  QUALITY: Photorealistic, 8k resolution, fashion magazine quality. 
-  CRITICAL: Maintain the exact facial structure and identity of the reference photo if provided.`;
+  ATMOSPHERE: ${weather.precip > 0 ? 'Drizzly and moody' : 'Bright and crisp'}.
+  QUALITY: Photorealistic, 8k, fashion magazine.`;
   
   const parts: any[] = [{ text: prompt }];
   if (userImage) {
-    parts.push({
-      inlineData: {
-        data: userImage.split(',')[1] || userImage,
-        mimeType: 'image/jpeg'
-      }
-    });
+    parts.push({ inlineData: { data: userImage.split(',')[1] || userImage, mimeType: 'image/jpeg' } });
   }
 
-  try {
-    console.log("Requesting image from gemini-3-pro-image-preview...");
-    const response: any = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: { parts },
-      config: {
-        imageConfig: { aspectRatio: "3:4", imageSize: size }
-      }
-    });
+  const response: any = await ai.models.generateContent({
+    model: 'gemini-3-pro-image-preview',
+    contents: { parts },
+    config: { imageConfig: { aspectRatio: "3:4", imageSize: size } }
+  });
 
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      const mimeType = part.inlineData.mimeType || 'image/png';
+      return `data:${mimeType};base64,${part.inlineData.data}`;
     }
-    throw new Error("API returned success but no image payload was found.");
-  } catch (err: any) {
-    console.error("GEMINI IMAGE GEN ERROR:", err.message);
-    if (err.message?.includes("404") || err.message?.includes("not found")) {
-      console.error("DIAGNOSTIC: This usually means your API Key is not from a paid Google Cloud project.");
-    }
-    throw err;
   }
+  throw new Error("No image returned.");
 };
 
 export const generateOutfitImages = async (
@@ -150,10 +197,11 @@ export const generateOutfitImages = async (
   unit: TempUnit = 'F',
   userImage?: string
 ): Promise<string[]> => {
+  const profile = getUserProfile();
   const variations = [
-    { palette: "Sophisticated Neutrals", theme: "Sleek & Modernist", subject: "A stylish East Asian person" },
-    { palette: "Rich Textural Tones", theme: "Bold & Avant-garde", subject: "A confident Black individual" },
-    { palette: "Urban Heritage Earthtones", theme: "Classic & Timeless", subject: "A person reflecting sophisticated urban elegance" }
+    { palette: profile.preferredPalette.join(', '), theme: profile.styleArchetype, subject: "A person reflecting urban elegance" },
+    { palette: "High Contrast", theme: `Experimental ${profile.styleArchetype}`, subject: "A bold fashion-forward individual" },
+    { palette: "Muted Earthtones", theme: `Casual ${profile.styleArchetype}`, subject: "A relaxed urban traveler" }
   ];
 
   return Promise.all(variations.map(v => 
@@ -175,41 +223,41 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
   });
 
   for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    if (part.inlineData) {
+      const mimeType = part.inlineData.mimeType || 'image/png';
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
   }
-  throw new Error("No edited image data found.");
+  throw new Error("No image data found.");
 };
 
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
-  const prompt = `Cinematic photo of ${weather.location} at ${displayTemp}°${unit}, ${weather.precip}mm rain, ${weather.wind}km/h wind. Wide-angle.`;
+  const prompt = `Cinematic photo of ${weather.location} at ${displayTemp}°${unit}. Wide-angle fashion landscape. No text. Photorealistic.`;
   
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: { parts: [{ text: prompt }] },
-    config: { imageConfig: { aspectRatio: "16:9" } }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: "16:9" } }
+    });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        const detectedMimeType = part.inlineData.mimeType || 'image/png';
+        return `data:${detectedMimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error("No image data.");
+  } catch (err: any) {
+    throw err;
   }
-  throw new Error("No weather hero image found.");
 };
 
-// GOOGLE MAPS GROUNDING INTEGRATION
 export const getPlanRecommendations = async (location: string, outfit: OutfitSuggestion, lat: number, lon: number): Promise<{ text: string, links: GroundingLink[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `I need specifically grounded locations in ${location} for these categories:
-    1. Explore: ${outfit.activity}
-    2. Eat/Drink: ${outfit.coffeeSpot}
-    3. Shop: ${outfit.storeType}
-    
-    CRITICAL INSTRUCTION: For EVERY place found, you MUST provide a line in this exact format:
-    "[Place Name] - Reason: [A exactly 5-word description of why this fits the outfit and mood]"
-    Example: "The Roastery - Reason: Warm lighting complements your knits."`;
-
+  const prompt = `Recommend grounded locations in ${location} for: Explore (${outfit.activity}), Eat (${outfit.coffeeSpot}), Shop (${outfit.storeType}).`;
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
@@ -218,85 +266,19 @@ export const getPlanRecommendations = async (location: string, outfit: OutfitSug
       toolConfig: { retrievalConfig: { latLng: { latitude: lat, longitude: lon } } }
     }
   });
-
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-  const responseText = response.text || "";
-  
-  const reasonsMap: Record<string, string> = {};
-  const reasonMatches = responseText.matchAll(/(.*?) - Reason: (.*)/g);
-  for (const match of reasonMatches) {
-    const title = match[1].trim().toLowerCase();
-    const reason = match[2].trim();
-    reasonsMap[title] = reason;
-  }
-  
-  const links: GroundingLink[] = groundingChunks
-    .filter((chunk: any) => chunk.maps)
-    .map((chunk: any) => {
-      const originalTitle = chunk.maps.title;
-      const titleLower = originalTitle.toLowerCase();
-      let type: 'eat' | 'explore' | 'shop' | undefined;
-      
-      if (titleLower.includes('cafe') || titleLower.includes('coffee') || titleLower.includes('restaurant') || titleLower.includes('bistro') || titleLower.includes('bar') || titleLower.includes('pub')) {
-        type = 'eat';
-      } else if (titleLower.includes('park') || titleLower.includes('museum') || titleLower.includes('gallery') || titleLower.includes('landmark') || titleLower.includes('pier') || titleLower.includes('square')) {
-        type = 'explore';
-      } else {
-        type = 'shop';
-      }
-
-      let reason = "Perfectly fits your current aesthetic.";
-      for (const [key, val] of Object.entries(reasonsMap)) {
-        if (titleLower.includes(key) || key.includes(titleLower)) {
-          reason = val;
-          break;
-        }
-      }
-      
-      return { 
-        uri: chunk.maps.uri, 
-        title: originalTitle,
-        reason: reason,
-        type
-      };
-    }) || [];
-
-  return { text: responseText, links };
+  const links: GroundingLink[] = groundingChunks.filter((c: any) => c.maps).map((c: any) => ({ uri: c.maps.uri, title: c.maps.title }));
+  return { text: response.text || "", links };
 };
 
-export function decode(base64: string) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-export function encode(bytes: Uint8Array) {
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-export async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
+export function decode(base64: string) { return new Uint8Array(atob(base64).split("").map(c => c.charCodeAt(0))); }
+export function encode(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)); }
+export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
+  const buffer = ctx.createBuffer(numChannels, dataInt16.length / numChannels, sampleRate);
+  for (let c = 0; c < numChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < d.length; i++) d[i] = dataInt16[i * numChannels + c] / 32768.0;
   }
   return buffer;
 }
