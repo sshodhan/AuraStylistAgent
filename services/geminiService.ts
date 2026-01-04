@@ -91,8 +91,9 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
+  // CRITICAL: Preserve likeness instruction for personalized checks
   const subjectDescription = userImage 
-    ? `this specific person shown in the reference image, realistically dressed in the new outfit while maintaining their likeness`
+    ? `this exact individual from the reference photo. MAINTAIN THEIR LIKENESS, facial structure, and identity perfectly while dressing them in the new outfit.`
     : subject;
 
   const prompt = `High-fashion editorial photo of ${subjectDescription} in ${weather.location}. 
@@ -148,7 +149,6 @@ export const generateOutfitImages = async (
   unit: TempUnit = 'F',
   userImage?: string
 ): Promise<string[]> => {
-  // If user provides an image, we focus on personalizing it specifically
   if (userImage) {
     const p1 = generateOutfitImage(outfit, weather, size, unit, "personalized look", userImage);
     const p2 = generateOutfitImage(outfit, weather, size, unit, "alternate personalized look", userImage);
@@ -165,9 +165,15 @@ export const generateOutfitImages = async (
   return Promise.all(subjects.map(subject => generateOutfitImage(outfit, weather, size, unit, subject)));
 };
 
-// Edits an image based on a text prompt using Gemini 2.5 Flash Image
+// Edits an image based on a text prompt using Gemini 2.5 Flash Image (Nano Banana)
 export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  // The model must preserve likeness if it was a personalized photo
+  const enhancedPrompt = `Perform the following edit on this photo: "${prompt}". 
+  Crucial instruction: Keep the subject's physical identity, face, and likeness exactly as they appear in the original image. 
+  Only change the specific elements requested in the prompt.`;
+
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -178,7 +184,7 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
             mimeType: 'image/jpeg',
           },
         },
-        { text: prompt },
+        { text: enhancedPrompt },
       ],
     },
     config: {

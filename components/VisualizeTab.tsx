@@ -331,7 +331,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <Wand className="w-3.5 h-3.5 text-indigo-600" />
-                        <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Magic Retouch</h4>
+                        <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Magic Retouch (Nano Banana)</h4>
                       </div>
                       <div className="relative">
                         <input 
@@ -349,6 +349,14 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                           {isEditing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                         </button>
                       </div>
+                      
+                      {userPhoto && (
+                        <div className="flex items-center gap-2 px-1 py-0.5">
+                          <User className="w-2.5 h-2.5 text-indigo-400" />
+                          <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Likeness Protection Active</p>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-2">
                         {["Retro filter", "BW photo", "Golden hour", "Cyberpunk", "Remove background"].map(suggestion => (
                           <button
