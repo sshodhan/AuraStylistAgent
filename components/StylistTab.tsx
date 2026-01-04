@@ -1,9 +1,41 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
 import { fetchWeather, geocode } from '../services/weatherService';
 import { getOutfitSuggestion, generateOutfitImage, generateWeatherHeroImage } from '../services/geminiService';
-import { Search, Loader2, Thermometer, Wind, CloudRain, AlertCircle, Sparkles, Camera, Download, RefreshCw, CloudIcon, Sun, CloudLightning, Droplets } from 'lucide-react';
+import { 
+  Search, 
+  Loader2, 
+  Sparkles, 
+  Camera, 
+  Download, 
+  RefreshCw, 
+  CloudIcon, 
+  Sun, 
+  CloudLightning, 
+  Droplets,
+  Shirt,
+  Briefcase,
+  Footprints,
+  Moon,
+  Zap,
+  Check
+} from 'lucide-react';
+
+interface StylePersona {
+  id: string;
+  name: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+const STYLE_PERSONAS: StylePersona[] = [
+  { id: 'casual', name: 'Minimalist', label: 'Effortless', icon: Shirt },
+  { id: 'formal office', name: 'Executive', label: 'Powerful', icon: Briefcase },
+  { id: 'casual hike', name: 'Explorer', label: 'Rugged', icon: Footprints },
+  { id: 'night out', name: 'Socialite', label: 'Chic', icon: Moon },
+  { id: 'athletic', name: 'Athlete', label: 'Active', icon: Zap },
+];
 
 interface Props {
   unit: TempUnit;
@@ -34,8 +66,6 @@ const StylistTab: React.FC<Props> = ({
   const [visualizing, setVisualizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const contexts = ['casual', 'formal office', 'casual hike', 'night out', 'athletic'];
-
   const handleGenerate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoading(true);
@@ -63,6 +93,26 @@ const StylistTab: React.FC<Props> = ({
       setLoading(false);
     }
   };
+
+  const refreshSuggestion = useCallback(async (currentWeather: WeatherData, personaId: string) => {
+    setLoading(true);
+    setError(null);
+    onOutfitImageUpdate(null);
+    try {
+      const suggestion = await getOutfitSuggestion(currentWeather, personaId, unit);
+      onOutfitUpdate(suggestion);
+    } catch (err: any) {
+      setError("Failed to update recommendation.");
+    } finally {
+      setLoading(false);
+    }
+  }, [unit, onOutfitUpdate, onOutfitImageUpdate]);
+
+  useEffect(() => {
+    if (weather) {
+      refreshSuggestion(weather, context);
+    }
+  }, [context]);
 
   const handleVisualize = async () => {
     if (!currentOutfit || !weather) return;
@@ -95,7 +145,7 @@ const StylistTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
-      {/* Dynamic Climate Header - Fixed Aspect Ratio */}
+      {/* Dynamic Climate Header */}
       <div className="relative w-full aspect-[16/8] bg-gray-100 rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 shrink-0">
         {(weatherHero && !loading) ? (
           <>
@@ -133,87 +183,119 @@ const StylistTab: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Action Controls */}
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-3">
+      {/* Style Persona Carousel */}
+      <div className="space-y-2">
+        <h3 className="px-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">Select Your Persona</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x px-1">
+          {STYLE_PERSONAS.map((persona) => {
+            const Icon = persona.icon;
+            const isActive = context === persona.id;
+            return (
+              <button
+                key={persona.id}
+                onClick={() => setContext(persona.id)}
+                className={`flex-shrink-0 w-22 h-18 rounded-[1.25rem] border-2 transition-all duration-300 flex flex-col items-center justify-center snap-center relative ${
+                  isActive 
+                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105 z-10' 
+                    : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-100'
+                }`}
+              >
+                <div className={`p-1 rounded-lg mb-0.5 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                </div>
+                <div className="text-center flex flex-col">
+                  <span className={`text-[8px] font-black uppercase tracking-tight leading-tight ${isActive ? 'text-white' : 'text-gray-900'}`}>{persona.name}</span>
+                  <span className={`text-[6px] font-bold uppercase tracking-widest opacity-60 mt-0.5 leading-none ${isActive ? 'text-indigo-100' : 'text-gray-400'}`}>{persona.label}</span>
+                </div>
+                {isActive && (
+                   <div className="absolute top-1.5 right-1.5">
+                     <div className="bg-white rounded-full p-0.5 shadow-sm">
+                       <Check className="w-1.5 h-1.5 text-indigo-600 stroke-[5px]" />
+                     </div>
+                   </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Location Controls */}
+      <div className="bg-white p-2.5 rounded-[1.75rem] shadow-sm border border-gray-100">
         <form onSubmit={handleGenerate} className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
             <input
               type="text"
               value={locationInput}
               onChange={(e) => setLocationInput(e.target.value)}
               placeholder="Enter city..."
-              className="w-full pl-9 pr-3 py-3 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-100 outline-none text-xs font-bold transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-indigo-100 outline-none text-[11px] font-bold transition-all"
             />
           </div>
-          <select
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            className="px-3 py-3 bg-gray-50 border border-transparent rounded-xl outline-none text-[10px] font-black uppercase tracking-tighter"
-          >
-            {contexts.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
           <button
             disabled={loading}
-            className="bg-indigo-600 text-white p-3 rounded-xl disabled:bg-indigo-300 shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+            className="bg-indigo-600 text-white px-3.5 rounded-xl disabled:bg-indigo-300 shadow-md shadow-indigo-100 active:scale-95 transition-all flex items-center justify-center"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
         </form>
       </div>
 
-      {error && <div className="p-3 bg-red-50 text-red-500 rounded-xl text-[10px] font-black uppercase border border-red-100 animate-in fade-in">{error}</div>}
+      {error && <div className="p-2 bg-red-50 text-red-500 rounded-lg text-[9px] font-black uppercase border border-red-100 animate-in fade-in">{error}</div>}
 
       {/* Suggestion Card */}
-      {currentOutfit && weather && !loading && (
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col animate-in slide-in-from-bottom-2 duration-300">
-          <div className="p-6 space-y-5">
+      {currentOutfit && weather && (
+        <div className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ${loading ? 'opacity-50 grayscale-[0.5]' : 'opacity-100 animate-in slide-in-from-bottom-2'}`}>
+          <div className="p-6 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-widest">Aura Recommendation</span>
-              <Sparkles className="w-4 h-4 text-indigo-500" />
+              <span className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-lg uppercase tracking-[0.2em]">
+                {loading ? 'Styling...' : 'The Verdict'}
+              </span>
+              <Sparkles className={`w-3.5 h-3.5 text-indigo-500 ${loading ? 'animate-pulse' : ''}`} />
             </div>
             
             <div className="grid grid-cols-1 gap-4">
-              <OutfitSmallItem label="Base" value={currentOutfit.baseLayer} />
-              <OutfitSmallItem label="Outer" value={currentOutfit.outerwear} />
-              <OutfitSmallItem label="Feet" value={currentOutfit.footwear} />
+              <OutfitSmallItem label="Core" value={currentOutfit.baseLayer} />
+              <OutfitSmallItem label="Shell" value={currentOutfit.outerwear} />
+              <OutfitSmallItem label="Step" value={currentOutfit.footwear} />
             </div>
 
             <div className="pt-4 border-t border-gray-50">
-              <p className="text-xs text-gray-600 font-medium leading-relaxed italic line-clamp-2">
+              <p className="text-[11px] text-gray-500 font-medium leading-relaxed italic">
                 "{currentOutfit.proTip}"
               </p>
             </div>
 
             <button
               onClick={handleVisualize}
-              disabled={visualizing}
-              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-colors flex items-center justify-center gap-2"
+              disabled={visualizing || loading}
+              className="w-full py-4 bg-gray-900 text-white rounded-xl font-black text-[9px] uppercase tracking-[0.3em] hover:bg-black transition-all flex items-center justify-center gap-2.5 active:scale-95 shadow-lg shadow-gray-100 disabled:bg-gray-400"
             >
-              {visualizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
-              {outfitImage ? "Regenerate Visual" : "Visualize this Look"}
+              {visualizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              {outfitImage ? "Regenerate Render" : "Visualize Look"}
             </button>
           </div>
 
           {outfitImage && (
             <div className="aspect-[3/4] relative group">
               <img src={outfitImage} alt="Visual" className="w-full h-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 p-6 flex justify-end">
-                 <a href={outfitImage} download className="p-3 bg-white rounded-2xl text-indigo-600 shadow-xl"><Download className="w-5 h-5" /></a>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-6 flex justify-end">
+                 <a href={outfitImage} download className="p-3 bg-white rounded-xl text-indigo-600 shadow-2xl active:scale-90 transition-all"><Download className="w-5 h-5" /></a>
               </div>
             </div>
           )}
         </div>
       )}
-      <div className="h-4" /> {/* Spacer for scroll end */}
+      <div className="h-6" />
     </div>
   );
 };
 
 const OutfitSmallItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
   <div className="flex gap-4 items-start">
-    <span className="w-12 text-[9px] font-black text-indigo-300 uppercase mt-1 tracking-tighter shrink-0">{label}</span>
-    <p className="flex-1 text-sm font-black text-gray-900 leading-tight">{value}</p>
+    <span className="w-12 text-[8px] font-black text-indigo-300 uppercase mt-0.5 tracking-[0.1em] shrink-0">{label}</span>
+    <p className="flex-1 text-[13px] font-black text-gray-900 leading-tight">{value}</p>
   </div>
 );
 
