@@ -130,16 +130,11 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
       const isSelected = gem.id === activeGemId;
       const icon = L.divIcon({
         className: 'custom-div-icon',
-        html: `<div class="flex items-center gap-2 px-3 py-1.5 rounded-full shadow-2xl border-2 transition-all whitespace-nowrap ${
-          isSelected 
-            ? 'bg-indigo-600 text-white border-indigo-400 scale-110 z-50' 
-            : 'bg-white text-gray-900 border-gray-100'
-        }">
-          <span class="text-sm">${gem.type === 'eat' ? '☕' : gem.type === 'explore' ? '🧭' : '🛍️'}</span>
-          <span class="text-[9px] font-black uppercase tracking-tight">${gem.title.split(' ').slice(0, 2).join(' ')}</span>
+        html: `<div class="w-8 h-8 ${isSelected ? 'bg-indigo-600' : 'bg-white'} rounded-2xl shadow-xl flex items-center justify-center border-2 border-indigo-600/10 transition-all ${isSelected ? 'scale-125' : ''}">
+          <span class="text-xs">${gem.type === 'eat' ? '☕' : gem.type === 'explore' ? '🧭' : '🛍️'}</span>
         </div>`,
-        iconSize: [120, 32],
-        iconAnchor: [60, 16]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
       L.marker([gem.lat, gem.lon], { icon }).addTo(markerGroupRef.current!).on('click', () => handleLocateGem(gem));
     });
@@ -170,41 +165,20 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
         </div>
       </div>
 
-      {/* Map View with Pills Overlay */}
-      <div className="relative h-[320px] rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl bg-gray-50 mx-1">
+      {/* Map View */}
+      <div className="relative h-[280px] rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl bg-gray-50 mx-1">
         <div ref={mapContainerRef} className="h-full w-full" id="aura-map-container" />
-        
-        {/* Filters Overlay - The "Pills" */}
-        <div className="absolute top-4 inset-x-4 z-[1000] flex justify-between items-start pointer-events-none">
-          <div className="flex flex-wrap gap-2 pointer-events-auto max-w-[80%]">
+        <div className="absolute top-4 inset-x-4 z-[1000] flex justify-between items-center pointer-events-none">
+          <div className="flex gap-1.5 pointer-events-auto overflow-x-auto scrollbar-hide pb-2">
              {['all', 'eat', 'explore', 'shop'].map(f => (
-               <button 
-                 key={f} 
-                 onClick={() => setActiveFilter(f as any)} 
-                 className={`px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all shadow-xl ${
-                   activeFilter === f 
-                    ? 'bg-indigo-600 text-white border-transparent' 
-                    : 'bg-white/95 backdrop-blur-md text-gray-900 border border-gray-100'
-                 }`}
-               >
+               <button key={f} onClick={() => setActiveFilter(f as any)} className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeFilter === f ? 'bg-indigo-600 text-white shadow-xl' : 'bg-white/95 backdrop-blur-md text-gray-600 shadow-sm'}`}>
                  {f === 'all' ? 'All Gems' : f}
                </button>
              ))}
           </div>
-          <button 
-            onClick={() => mapInstanceRef.current?.flyTo([weather.coords?.lat || 0, weather.coords?.lon || 0], 14)} 
-            className="p-3.5 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 pointer-events-auto active:scale-95"
-          >
+          <button onClick={() => mapInstanceRef.current?.flyTo([weather.coords?.lat || 0, weather.coords?.lon || 0], 14)} className="p-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 pointer-events-auto">
             <Crosshair className="w-4 h-4" />
           </button>
-        </div>
-
-        {/* Legend / Status Overlay */}
-        <div className="absolute bottom-6 left-6 z-[1000] bg-gray-950/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 text-white shadow-2xl pointer-events-none">
-           <div className="flex items-center gap-2">
-             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-             <span className="text-[8px] font-black uppercase tracking-widest opacity-80">{weather.location} Guide</span>
-           </div>
         </div>
       </div>
 
@@ -216,7 +190,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
           </div>
         ) : (
           <>
-            {/* Collapsible Strategy Card */}
+            {/* Collapsible Strategy Card - Matching Screenshot */}
             {recommendations && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-950 rounded-[2.5rem] shadow-2xl relative overflow-hidden mx-1">
                 <button 
@@ -247,7 +221,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
               </motion.div>
             )}
 
-            {/* Destination Sections */}
+            {/* Destination Sections with 3-item limit and VV expansion */}
             <div className="space-y-12">
                <DestinationSection title="Eat & Drink" type="eat" gems={gems} onLocate={handleLocateGem} />
                <DestinationSection title="Explore & Play" type="explore" gems={gems} onLocate={handleLocateGem} />

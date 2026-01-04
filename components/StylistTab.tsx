@@ -377,10 +377,8 @@ const StylistTab: React.FC<Props> = ({
                 {activePersona.name} • {getDisplayTemp(weather.temp)}°{unit}
               </p>
             </div>
-            {/* Fix: Error in file components/StylistTab.tsx on line 381: An expression of type 'void' cannot be tested for truthiness. */}
-            {/* Use ternary to avoid using 'void' return from onFitCheck?() in logical OR. */}
             <button 
-              onClick={() => onFitCheck ? onFitCheck() : onTabChange(AppTab.VISUALIZE)} 
+              onClick={() => onFitCheck?.() || onTabChange(AppTab.VISUALIZE)} 
               className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-lg active:scale-95 group transition-all"
             >
               <Camera className="w-4 h-4 group-hover:rotate-12 transition-transform" />
@@ -389,12 +387,12 @@ const StylistTab: React.FC<Props> = ({
           </div>
 
           {/* New Narrative Block - Placed on Top of Fit */}
-          <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden text-center">
+          <div className="bg-indigo-600 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
             <Sparkles className="absolute -top-4 -right-4 w-20 h-20 opacity-10" />
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Your Day Guide</p>
-            <h3 className="text-xl font-black uppercase tracking-wide leading-tight">
-              {currentOutfit.tagline}
-            </h3>
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Weather Story</p>
+            <p className="text-xs font-bold leading-relaxed tracking-tight">
+              {currentOutfit.weatherStory}
+            </p>
           </div>
 
           {/* The Fit Block - Compacted to show in viewport */}
@@ -460,7 +458,7 @@ const VerdictItem: React.FC<VerdictItemProps> = ({ icon, label, value, accent, o
 
   return (
     <div className="flex items-center gap-4 group" onClick={onAction}>
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ${colors[accent]}`}>
+      <div className={`p-3 rounded-2xl shrink-0 transition-transform duration-300 group-hover:scale-110 ${colors[accent]}`}>
         {icon}
       </div>
       <div className="flex-1 space-y-0.5">
