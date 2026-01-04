@@ -86,24 +86,28 @@ export const generateOutfitImage = async (
   size: "1K" | "2K" | "4K" = "1K", 
   unit: TempUnit = 'F', 
   subject: string = "a stylish person",
-  userImage?: string // base64 data
+  userImage?: string, // base64 data
+  visualVariation: string = "standard high-fashion"
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
   // CRITICAL: Preserve likeness instruction for personalized checks
   const subjectDescription = userImage 
-    ? `this exact individual from the reference photo. MAINTAIN THEIR LIKENESS, facial structure, and identity perfectly while dressing them in the new outfit.`
+    ? `this exact individual from the reference photo. MAINTAIN THEIR LIKENESS, facial structure, and identity perfectly.`
     : subject;
 
   const prompt = `High-fashion editorial photo of ${subjectDescription} in ${weather.location}. 
-  STYLING VERDICT TO FOLLOW EXACTLY:
+  THEME: ${visualVariation}. 
+  STYLING VERDICT TO FOLLOW (Adhere to layers but vary colors/fabrics for this variation):
   - Base: ${outfit.baseLayer}
   - Outerwear: ${outfit.outerwear}
   - Shoes: ${outfit.footwear}
-  - Stylist Note: ${outfit.proTip}
   
-  ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
+  ARTISTIC DIRECTION: 
+  - Vary the color palette (e.g., if one version is dark, make this one lighter or earth-toned).
+  - Use specific fabric textures mentioned in "${visualVariation}".
+  - ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
   
   const parts: any[] = [{ text: prompt }];
   
@@ -141,7 +145,7 @@ export const generateOutfitImage = async (
   throw new Error("No image data found.");
 };
 
-// Generates multiple variations for lookbook
+// Generates multiple variations for lookbook with distinct colorways and styles
 export const generateOutfitImages = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -149,27 +153,32 @@ export const generateOutfitImages = async (
   unit: TempUnit = 'F',
   userImage?: string
 ): Promise<string[]> => {
-  if (userImage) {
-    const p1 = generateOutfitImage(outfit, weather, size, unit, "personalized look", userImage);
-    const p2 = generateOutfitImage(outfit, weather, size, unit, "alternate personalized look", userImage);
-    const p3 = generateOutfitImage(outfit, weather, size, unit, "stylized personalized look", userImage);
-    return Promise.all([p1, p2, p3]);
-  }
-
-  const subjects = [
-    "a stylish woman wearing a feminine, high-fashion interpretation of the outfit with elegant styling",
-    "a stylish man wearing a masculine, high-fashion version of the outfit",
-    "a diverse biracial pair of people (including a person of color) together in high-fashion coordinated looks"
+  
+  // Define 3 distinct visual "Moodboards" to prevent repetitive outputs
+  const variations = [
+    {
+      subject: "a stylish individual",
+      theme: "Monochromatic & Minimalist: focus on sleek silhouettes, subtle shadows, and a neutral, high-end palette like charcoals, creams, or forest greens."
+    },
+    {
+      subject: "a fashionable person",
+      theme: "Bold Textures & Patterns: emphasize luxury fabrics like heavy wools, silks, or corduroy with rich, contrasting colors and striking editorial lighting."
+    },
+    {
+      subject: "a sophisticated trendsetter",
+      theme: "Classic Heritage & Urban: focus on timeless styling, soft morning lighting, and a palette of warm earth tones, tans, or deep navys for a refined city look."
+    }
   ];
 
-  return Promise.all(subjects.map(subject => generateOutfitImage(outfit, weather, size, unit, subject)));
+  return Promise.all(variations.map(v => 
+    generateOutfitImage(outfit, weather, size, unit, v.subject, userImage, v.theme)
+  ));
 };
 
 // Edits an image based on a text prompt using Gemini 2.5 Flash Image (Nano Banana)
 export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // The model must preserve likeness if it was a personalized photo
   const enhancedPrompt = `Perform the following edit on this photo: "${prompt}". 
   Crucial instruction: Keep the subject's physical identity, face, and likeness exactly as they appear in the original image. 
   Only change the specific elements requested in the prompt.`;
