@@ -47,23 +47,33 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
 
   const handleGenerate = async () => {
     if (!outfit || !weather) return;
-    if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      if (!hasKey) await (window as any).aistudio.openSelectKey();
-    }
+    
     setLoading(true);
     setError(null);
     setEditingIndex(null);
     setIsHubExpanded(false);
+
     try {
+      // Check for key before proceeding
+      if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+           await (window as any).aistudio.openSelectKey();
+        }
+      }
+
       const urls = await generateOutfitImages(outfit, weather, size, unit, userPhoto || undefined);
       onImagesUpdate(urls);
     } catch (err: any) {
-      if (err.message?.includes("Requested entity was not found")) {
-        setError("Please re-select your API key with a paid project.");
-        if (typeof (window as any).aistudio?.openSelectKey === 'function') await (window as any).aistudio.openSelectKey();
+      console.error("UI CATCH: Image Generation Failed", err);
+      
+      const msg = err.message || "";
+      if (msg.includes("Requested entity was not found") || msg.includes("404")) {
+        setError("BILLING ERROR: This model (Gemini 3 Pro) requires an API key from a Paid Google Cloud project. Please check ai.google.dev/billing.");
+      } else if (msg.includes("timeout") || msg.includes("fetch")) {
+        setError("NETWORK ERROR: The generation timed out. If you are on a Vercel Hobby plan, try again with a 1K size setting.");
       } else {
-        setError("Rendering failed. Verify your API key status.");
+        setError(`RENDER FAILED: ${msg.slice(0, 100)}... Check browser console for details.`);
       }
       setIsHubExpanded(true);
     } finally {
@@ -87,13 +97,6 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
     } finally {
       setIsEditing(false);
     }
-  };
-
-  const handleSelectSuggestion = (suggestion: string) => {
-    setEditPrompt(suggestion);
-    setPulseInput(true);
-    setTimeout(() => setPulseInput(false), 600);
-    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   if (!outfit) return null;
@@ -160,12 +163,30 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
           <h2 className="text-sm font-black flex items-center gap-2 text-gray-900 uppercase tracking-widest">Style Lab</h2>
           <div className="bg-indigo-50 px-2 py-1 rounded-md"><span className="text-[8px] font-black text-indigo-600 uppercase">Gemini 3 Pro</span></div>
         </div>
-        <button onClick={handleGenerate} disabled={loading} className={`w-full py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 active:scale-95 shadow-xl ${userPhoto ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-gray-900 text-white shadow-gray-200'}`}>
+        
+        {/* Controls for Size - useful for debugging timeouts */}
+        <div className="flex bg-gray-50 p-1 rounded-xl gap-1">
+          {(["1K", "2K", "4K"] as const).map((s) => (
+            <button key={s} onClick={() => setSize(s)} className={`flex-1 py-1.5 rounded-lg text-[8px] font-black transition-all ${size === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>
+              {s}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={handleGenerate} disabled={loading} className={`w-full py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 active:scale-95 shadow-xl ${userPhoto ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-gray-900 text-white shadow-gray-200'} disabled:opacity-50`}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{userPhoto ? "Personalized Fit Check" : "Generate Range Brief"}</>}
         </button>
       </div>
 
-      {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 border border-red-100 mx-1"><AlertCircle className="w-4 h-4 shrink-0" /><p>{error}</p></div>}
+      {error && (
+        <div className="bg-rose-50 text-rose-600 p-5 rounded-[2rem] text-[10px] font-black uppercase flex flex-col gap-3 border border-rose-100 mx-1 shadow-sm animate-in shake-in">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <p className="flex-1 leading-relaxed tracking-tight">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-[8px] underline text-rose-400 self-end">Dismiss</button>
+        </div>
+      )}
 
       <div className="space-y-12">
         {loading ? (
@@ -183,7 +204,6 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                 <div className="relative aspect-[3/4] bg-gray-50 rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-2xl animate-in zoom-in-95">
                   <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
                   
-                  {/* Updated Overlay from Screenshot */}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-10 flex justify-between items-end">
                     <div className="text-white space-y-1.5">
                       <p className="text-[8px] font-black uppercase tracking-[0.2em] opacity-80">Look Details</p>

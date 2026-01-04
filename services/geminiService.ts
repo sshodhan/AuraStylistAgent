@@ -28,30 +28,34 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
     - Match everything to the "${context}" aesthetic.
   `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          baseLayer: { type: Type.STRING },
-          outerwear: { type: Type.STRING },
-          footwear: { type: Type.STRING },
-          proTip: { type: Type.STRING },
-          styleReasoning: { type: Type.STRING },
-          weatherStory: { type: Type.STRING },
-          activity: { type: Type.STRING },
-          coffeeSpot: { type: Type.STRING },
-          storeType: { type: Type.STRING },
-        },
-        required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            baseLayer: { type: Type.STRING },
+            outerwear: { type: Type.STRING },
+            footwear: { type: Type.STRING },
+            proTip: { type: Type.STRING },
+            styleReasoning: { type: Type.STRING },
+            weatherStory: { type: Type.STRING },
+            activity: { type: Type.STRING },
+            coffeeSpot: { type: Type.STRING },
+            storeType: { type: Type.STRING },
+          },
+          required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
+        }
       }
-    }
-  });
-
-  return JSON.parse(response.text || '{}');
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (err: any) {
+    console.error("Gemini Reasoner Error:", err);
+    throw err;
+  }
 };
 
 // Generates an email digest content
@@ -82,7 +86,6 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
 };
 
 // Generates a singular outfit image with deep contextual steering
-// MODEL: gemini-3-pro-image-preview is used for high-fidelity identity preservation
 export const generateOutfitImage = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -117,18 +120,27 @@ export const generateOutfitImage = async (
     });
   }
 
-  const response: any = await ai.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents: { parts },
-    config: {
-      imageConfig: { aspectRatio: "3:4", imageSize: size }
-    }
-  });
+  try {
+    console.log("Requesting image from gemini-3-pro-image-preview...");
+    const response: any = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: { parts },
+      config: {
+        imageConfig: { aspectRatio: "3:4", imageSize: size }
+      }
+    });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    }
+    throw new Error("API returned success but no image payload was found.");
+  } catch (err: any) {
+    console.error("GEMINI IMAGE GEN ERROR:", err.message);
+    if (err.message?.includes("404") || err.message?.includes("not found")) {
+      console.error("DIAGNOSTIC: This usually means your API Key is not from a paid Google Cloud project.");
+    }
+    throw err;
   }
-  throw new Error("No image data found.");
 };
 
 export const generateOutfitImages = async (
