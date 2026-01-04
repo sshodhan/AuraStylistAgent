@@ -35,9 +35,22 @@ export const geocode = async (location: string): Promise<{ lat: number; lon: num
 export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
   try {
     // Using Nominatim for reverse geocoding
+    // Adding zoom=10 to get a more general "city" level name
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
     const data = await response.json();
-    const city = data.address.city || data.address.town || data.address.village || data.address.suburb || "Your Location";
+    
+    if (!data || !data.address) return "Your Location";
+
+    // Priority order for display name
+    const city = data.address.city || 
+                 data.address.town || 
+                 data.address.municipality || 
+                 data.address.village || 
+                 data.address.suburb || 
+                 data.address.city_district || 
+                 data.address.county || 
+                 "Your Location";
+                 
     return city;
   } catch (err) {
     console.error("Reverse geocoding failed", err);
