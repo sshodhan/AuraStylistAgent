@@ -63,6 +63,7 @@ interface Props {
   onOutfitImageUpdate: (img: string | null) => void;
   currentOutfit: OutfitSuggestion | null;
   onTabChange: (tab: AppTab) => void;
+  onFitCheck?: () => void;
   styleContext: string;
   onStyleContextUpdate: (context: string) => void;
 }
@@ -86,6 +87,7 @@ const StylistTab: React.FC<Props> = ({
   onOutfitImageUpdate,
   currentOutfit,
   onTabChange,
+  onFitCheck,
   styleContext,
   onStyleContextUpdate
 }) => {
@@ -439,7 +441,7 @@ const StylistTab: React.FC<Props> = ({
               
               {/* Fit Check Button with Sparkle Treatment */}
               <button
-                onClick={() => onTabChange(AppTab.VISUALIZE)}
+                onClick={() => onFitCheck ? onFitCheck() : onTabChange(AppTab.VISUALIZE)}
                 disabled={loading}
                 className="relative overflow-hidden bg-slate-900 text-white px-4 py-2.5 rounded-full flex items-center gap-1.5 shadow-xl active:scale-95 transition-all hover:shadow-indigo-200/50 hover:bg-black group disabled:bg-gray-300"
               >

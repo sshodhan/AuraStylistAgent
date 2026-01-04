@@ -87,27 +87,28 @@ export const generateOutfitImage = async (
   unit: TempUnit = 'F', 
   subject: string = "a stylish person",
   userImage?: string, // base64 data
-  visualVariation: string = "standard high-fashion"
+  visualVariation: string = "standard high-fashion",
+  paletteHint: string = "neutral tones"
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
   
-  // CRITICAL: Preserve likeness instruction for personalized checks
   const subjectDescription = userImage 
-    ? `this exact individual from the reference photo. MAINTAIN THEIR LIKENESS, facial structure, and identity perfectly.`
+    ? `this exact individual from the reference photo. MAINTAIN THEIR LIKENESS AND FACIAL FEATURES PERFECTLY.`
     : subject;
 
   const prompt = `High-fashion editorial photo of ${subjectDescription} in ${weather.location}. 
-  THEME: ${visualVariation}. 
-  STYLING VERDICT TO FOLLOW (Adhere to layers but vary colors/fabrics for this variation):
+  THEMATIC DIRECTION: ${visualVariation}.
+  COLOR PALETTE: ${paletteHint}.
+  
+  STYLING VERDICT (REQUIRED GARMENTS):
   - Base: ${outfit.baseLayer}
   - Outerwear: ${outfit.outerwear}
   - Shoes: ${outfit.footwear}
   
-  ARTISTIC DIRECTION: 
-  - Vary the color palette (e.g., if one version is dark, make this one lighter or earth-toned).
-  - Use specific fabric textures mentioned in "${visualVariation}".
-  - ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
+  CRITICAL INSTRUCTION: Ensure the colors of the garments are strictly within the "${paletteHint}" family. 
+  This render must look distinctly different from other variations by using unique fabric textures and lighting.
+  ATMOSPHERE: ${displayTemp}°${unit} weather, cinematic lighting, photorealistic, 8k resolution.`;
   
   const parts: any[] = [{ text: prompt }];
   
@@ -145,7 +146,7 @@ export const generateOutfitImage = async (
   throw new Error("No image data found.");
 };
 
-// Generates multiple variations for lookbook with distinct colorways and styles
+// Generates 3 visually distinct variations with unique color palettes
 export const generateOutfitImages = async (
   outfit: OutfitSuggestion, 
   weather: WeatherData, 
@@ -154,24 +155,26 @@ export const generateOutfitImages = async (
   userImage?: string
 ): Promise<string[]> => {
   
-  // Define 3 distinct visual "Moodboards" to prevent repetitive outputs
   const variations = [
     {
       subject: "a stylish individual",
-      theme: "Monochromatic & Minimalist: focus on sleek silhouettes, subtle shadows, and a neutral, high-end palette like charcoals, creams, or forest greens."
+      palette: "Minimalist Neutrals: shades of charcoal grey, sand, and deep forest green",
+      theme: "Sleek Minimalist: focus on matte textures, clean silhouettes, and diffused daylight."
     },
     {
       subject: "a fashionable person",
-      theme: "Bold Textures & Patterns: emphasize luxury fabrics like heavy wools, silks, or corduroy with rich, contrasting colors and striking editorial lighting."
+      palette: "Bold Statement Tones: rich saffron yellow, burnt orange, and midnight navy",
+      theme: "Vibrant & Textural: focus on contrasting luxury fabrics like corduroy, wool, and leather under sharp, direct sunlight."
     },
     {
       subject: "a sophisticated trendsetter",
-      theme: "Classic Heritage & Urban: focus on timeless styling, soft morning lighting, and a palette of warm earth tones, tans, or deep navys for a refined city look."
+      palette: "Urban Heritage: shades of camel, deep burgundy, and slate blue",
+      theme: "Classic Sophisticate: focus on tonal layering, rich patterns, and golden-hour cinematic lighting."
     }
   ];
 
   return Promise.all(variations.map(v => 
-    generateOutfitImage(outfit, weather, size, unit, v.subject, userImage, v.theme)
+    generateOutfitImage(outfit, weather, size, unit, v.subject, userImage, v.theme, v.palette)
   ));
 };
 

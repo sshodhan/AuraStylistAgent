@@ -12,14 +12,16 @@ interface Props {
   imageUrls: string[] | null;
   onImagesUpdate: (urls: string[] | null) => void;
   onTabChange: (tab: AppTab) => void;
+  autoTrigger?: boolean;
 }
 
-const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onImagesUpdate, onTabChange }) => {
+const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onImagesUpdate, onTabChange, autoTrigger }) => {
   const [loading, setLoading] = useState(false);
   const [size, setSize] = useState<"1K" | "2K" | "4K">("1K");
   const [error, setError] = useState<string | null>(null);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [isHubExpanded, setIsHubExpanded] = useState(true);
+  const [pulseInput, setPulseInput] = useState(false);
   
   // Edit State
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -27,6 +29,14 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
   const [isEditing, setIsEditing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-generate if triggered from Stylist tab
+  useEffect(() => {
+    if (autoTrigger && outfit && weather && !imageUrls && !loading) {
+      handleGenerate();
+    }
+  }, [autoTrigger, outfit, weather, imageUrls]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,6 +99,14 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
     } finally {
       setIsEditing(false);
     }
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setEditPrompt(suggestion);
+    setPulseInput(true);
+    setTimeout(() => setPulseInput(false), 600);
+    // Visual focus
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   if (!outfit) {
@@ -321,33 +339,49 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                 </div>
 
                 {/* Magic Retouch Interface */}
-                <AnimatePresence>
+                <AnimatePresence mode="wait">
                   {editingIndex === idx && (
                     <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="bg-indigo-50 border border-indigo-100 p-4 rounded-[2rem] space-y-3"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="bg-indigo-50 border border-indigo-100 p-4 rounded-[2rem] space-y-3 overflow-hidden"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <Wand className="w-3.5 h-3.5 text-indigo-600" />
                         <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Magic Retouch (Nano Banana)</h4>
                       </div>
                       <div className="relative">
-                        <input 
-                          type="text"
-                          value={editPrompt}
-                          onChange={(e) => setEditPrompt(e.target.value)}
-                          placeholder="e.g. 'Add a retro filter' or 'Make it dusk'"
-                          className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-[11px] font-medium outline-none pr-12 shadow-sm focus:ring-2 focus:ring-indigo-600/20"
-                        />
-                        <button 
-                          onClick={() => handleApplyEdit(idx)}
-                          disabled={isEditing || !editPrompt.trim()}
-                          className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 transition-colors"
+                        <motion.div
+                          animate={pulseInput ? { scale: [1, 1.02, 1], boxShadow: ["0px 0px 0px rgba(79, 70, 229, 0)", "0px 0px 15px rgba(79, 70, 229, 0.3)", "0px 0px 0px rgba(79, 70, 229, 0)"] } : {}}
+                          transition={{ duration: 0.4 }}
                         >
-                          {isEditing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                        </button>
+                          <input 
+                            type="text"
+                            ref={inputRef}
+                            value={editPrompt}
+                            onChange={(e) => setEditPrompt(e.target.value)}
+                            placeholder="e.g. 'Add a retro filter' or 'Make it dusk'"
+                            className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-[11px] font-medium outline-none pr-20 shadow-sm focus:ring-2 focus:ring-indigo-600/20"
+                          />
+                        </motion.div>
+                        <div className="absolute right-1.5 top-1.5 bottom-1.5 flex gap-1">
+                          {editPrompt && (
+                            <button 
+                              onClick={() => setEditPrompt("")}
+                              className="px-2 text-gray-300 hover:text-gray-500 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleApplyEdit(idx)}
+                            disabled={isEditing || !editPrompt.trim()}
+                            className="px-3 bg-indigo-600 text-white rounded-lg disabled:bg-gray-300 transition-colors"
+                          >
+                            {isEditing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
                       
                       {userPhoto && (
@@ -357,12 +391,17 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 pt-1">
                         {["Retro filter", "BW photo", "Golden hour", "Cyberpunk", "Remove background"].map(suggestion => (
                           <button
                             key={suggestion}
-                            onClick={() => setEditPrompt(suggestion)}
-                            className="text-[8px] font-black uppercase tracking-wider text-indigo-600 bg-white border border-indigo-100 px-3 py-1.5 rounded-full hover:bg-indigo-600 hover:text-white transition-all"
+                            type="button"
+                            onClick={() => handleSelectSuggestion(suggestion)}
+                            className={`text-[8px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+                              editPrompt === suggestion 
+                                ? 'bg-indigo-600 text-white border-transparent' 
+                                : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'
+                            }`}
                           >
                             {suggestion}
                           </button>

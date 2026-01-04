@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [unit, setUnit] = useState<TempUnit>('F');
   const [styleContext, setStyleContext] = useState<string>('casual');
   const [userName, setUserName] = useState(() => localStorage.getItem('aura_user_name') || "YOU");
+  const [visualizeTriggered, setVisualizeTriggered] = useState(false);
 
   // Sync user name from local storage periodically or when settings might change it
   useEffect(() => {
@@ -33,7 +34,20 @@ const App: React.FC = () => {
       const name = localStorage.getItem('aura_user_name');
       setUserName(name ? name.toUpperCase() : "YOU");
     }
+    // Reset trigger when tab changes
+    if (activeTab !== AppTab.VISUALIZE) {
+      setVisualizeTriggered(false);
+    }
   }, [activeTab]);
+
+  const handleTabChange = (tab: AppTab) => {
+    setActiveTab(tab);
+  };
+
+  const handleFitCheck = () => {
+    setVisualizeTriggered(true);
+    setActiveTab(AppTab.VISUALIZE);
+  };
 
   const tabs = [
     { id: AppTab.STYLIST, label: 'Stylist', icon: Shirt },
@@ -114,7 +128,8 @@ const App: React.FC = () => {
                 onHeroUpdate={setWeatherHero}
                 onOutfitImageUpdate={(img) => setOutfitImages(img ? [img] : null)}
                 currentOutfit={outfit} 
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
+                onFitCheck={handleFitCheck}
                 styleContext={styleContext}
                 onStyleContextUpdate={setStyleContext}
               />
@@ -127,7 +142,8 @@ const App: React.FC = () => {
                 unit={unit} 
                 imageUrls={outfitImages} 
                 onImagesUpdate={setOutfitImages}
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
+                autoTrigger={visualizeTriggered}
               />
             )}
             {activeTab === AppTab.STORES && <StoresTab weather={weather} outfit={outfit} />}
@@ -145,7 +161,7 @@ const App: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 relative ${
                   isActive 
                     ? 'text-indigo-600' 
