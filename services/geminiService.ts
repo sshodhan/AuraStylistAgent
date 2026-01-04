@@ -4,6 +4,8 @@ import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile } f
 
 const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
 
+const getUserRole = (): string => "Professional Fashion Stylist and Quality Assurance Agent";
+
 const getUserProfile = (): UserProfile => {
   return {
     name: localStorage.getItem('aura_user_name') || "YOU",
@@ -29,14 +31,12 @@ export const generateVeoVideo = async (
   onStatusUpdate?.("Initializing Veo Portrait Engine...");
 
   try {
-    // To achieve 9:16 (Portrait), we use the 'image' (start frame) and 'lastFrame' (end frame) properties
-    // This provides a "taller" cinematic look preferred for fashion runway shots.
     const startImage = imageUrls[0].split(',')[1] || imageUrls[0];
     const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
 
     let operation = await ai.models.generateVideos({
       model: 'veo-3.1-generate-preview',
-      prompt: prompt,
+      prompt: `${prompt}. Full-body coverage is mandatory. Ensure trousers and shoes are clearly visible. No missing lower-body garments.`,
       image: {
         imageBytes: startImage,
         mimeType: 'image/png',
@@ -44,7 +44,7 @@ export const generateVeoVideo = async (
       config: {
         numberOfVideos: 1,
         resolution: '720p',
-        aspectRatio: '9:16', // Switched to 9:16 for full-body fashion height
+        aspectRatio: '9:16',
         lastFrame: {
           imageBytes: endImage,
           mimeType: 'image/png',
@@ -52,7 +52,7 @@ export const generateVeoVideo = async (
       }
     });
 
-    onStatusUpdate?.("Synthesizing Style Motion...");
+    onStatusUpdate?.("Applying Style Safety Guardrails...");
 
     while (!operation.done) {
       await new Promise(resolve => setTimeout(resolve, 10000));
@@ -61,29 +61,24 @@ export const generateVeoVideo = async (
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) throw new Error("Video generation failed to return a link.");
+    if (!downloadLink) throw new Error("Video generation failed.");
 
     const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     const blob = await videoResponse.blob();
     return URL.createObjectURL(blob);
   } catch (err: any) {
-    console.error("Veo Generation Error:", err);
-    if (err.message?.includes("Requested entity was not found")) {
-      await (window as any).aistudio.openSelectKey();
-      throw new Error("API Key reset required. Please select a paid project.");
-    }
+    console.error("Veo Error:", err);
     throw err;
   }
 };
 
 const getRandomReassuringMessage = () => {
   const messages = [
-    "Refining fabric physics...",
-    "Balancing atmospheric lighting...",
-    "Rendering cinematic motion...",
-    "Stitching frames for elegance...",
-    "Finalizing urban backdrop...",
-    "Syncing motion to fit..."
+    "Ensuring garment continuity...",
+    "Verifying anatomical layering...",
+    "Finalizing cinematic textures...",
+    "Stitching full-body frames...",
+    "Polishing urban lighting..."
   ];
   return messages[Math.floor(Math.random() * messages.length)];
 };
@@ -94,27 +89,15 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   const profile = getUserProfile();
   
   const prompt = `
-    You are a professional fashion stylist and urban concierge. A client is in ${weather.location}.
-    Weather: ${displayTemp}°${unit}, Precip: ${weather.precip}mm, Wind: ${weather.wind}km/h.
-    Client Persona: "${context}"
+    Role: ${getUserRole()}
+    Task: Suggest a complete, modest, high-fashion outfit for ${weather.location} at ${displayTemp}°${unit}.
     
-    CRITICAL PERSONALIZATION:
-    - User's Signature Archetype: "${profile.styleArchetype}"
-    - Preferred Color Palette: ${profile.preferredPalette.join(', ')}
-    - User Name: ${profile.name}
+    SAFETY MANDATE:
+    - You MUST provide a specific "lowerBody" garment (e.g., tailored trousers, chinos, denim, or long skirt). 
+    - Bare legs are strictly prohibited for this style archetype.
+    - Ensure the outfit is logically layered for the weather.
 
-    Suggest:
-    1. A 3-piece outfit (Base, Outerwear, Shoes) that strictly adheres to the ${profile.styleArchetype} aesthetic using colors from ${profile.preferredPalette.join(', ')}.
-    2. A "Weather Story": 2 sentences max. 
-    3. "Style Reasoning": Technical explanation of fabric choices and palette harmony.
-    4. A "Fun Activity" optimized for this vibe.
-    5. A "Coffee/Dining Vibe".
-    6. "Store Type".
-
-    Rules:
-    - If wind > 20km/h, prioritize structural outerwear.
-    - If temp > 25°C, prioritize linen and breathable silks.
-    - Personalize the response for ${profile.name}.
+    Style DNA: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
   `;
 
   try {
@@ -126,8 +109,9 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            baseLayer: { type: Type.STRING },
-            outerwear: { type: Type.STRING },
+            baseLayer: { type: Type.STRING, description: "Tops/Shirts" },
+            outerwear: { type: Type.STRING, description: "Coats/Jackets" },
+            lowerBody: { type: Type.STRING, description: "Trousers/Pants/Skirt - MANDATORY" },
             footwear: { type: Type.STRING },
             proTip: { type: Type.STRING },
             styleReasoning: { type: Type.STRING },
@@ -136,13 +120,12 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
             coffeeSpot: { type: Type.STRING },
             storeType: { type: Type.STRING },
           },
-          required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
+          required: ["baseLayer", "outerwear", "lowerBody", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
         }
       }
     });
     return JSON.parse(response.text || '{}');
   } catch (err: any) {
-    console.error("Gemini Reasoner Error:", err);
     throw err;
   }
 };
@@ -158,17 +141,23 @@ export const generateOutfitImage = async (
   paletteHint: string = "neutral tones"
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const displayTemp = convertTemp(weather.temp, unit);
   const profile = getUserProfile();
   
-  const prompt = `High-end editorial fashion photography. 
-  SUBJECT: ${userImage ? 'the person in the reference' : subject}.
-  THEME: ${profile.styleArchetype}.
-  PALETTE: ${profile.preferredPalette.join(', ')}.
-  LOCATION: ${weather.location} street scene.
-  OUTFIT: ${outfit.baseLayer}, ${outfit.outerwear}, ${outfit.footwear}.
-  ATMOSPHERE: ${weather.precip > 0 ? 'Drizzly and moody' : 'Bright and crisp'}.
-  QUALITY: Photorealistic, 8k, fashion magazine.`;
+  // GUARDRAIL: Forcing the model to explicitly render all garment layers to prevent missing pants under long coats.
+  const prompt = `
+    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH SHOT.
+    SUBJECT: ${userImage ? 'the person in the reference' : subject}.
+    THEME: ${visualVariation || profile.styleArchetype}.
+    PALETTE: ${paletteHint || profile.preferredPalette.join(', ')}.
+    MANDATORY GARMENTS: 
+    1. ${outfit.outerwear} (Outer Layer)
+    2. ${outfit.baseLayer} (Inner Layer)
+    3. ${outfit.lowerBody} (Mandatory - must be visible below coat)
+    4. ${outfit.footwear}
+    
+    SAFETY & QUALITY: Fully clothed, anatomically correct, high-fashion modesty. No bare legs.
+    ATMOSPHERE: ${weather.location} street scene, ${weather.precip > 0 ? 'drizzly' : 'crisp'}.
+  `.trim();
   
   const parts: any[] = [{ text: prompt }];
   if (userImage) {
@@ -183,11 +172,10 @@ export const generateOutfitImage = async (
 
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
-      const mimeType = part.inlineData.mimeType || 'image/png';
-      return `data:${mimeType};base64,${part.inlineData.data}`;
+      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("No image returned.");
+  throw new Error("Generation failed to return pixels.");
 };
 
 export const generateOutfitImages = async (
@@ -200,8 +188,7 @@ export const generateOutfitImages = async (
   const profile = getUserProfile();
   const variations = [
     { palette: profile.preferredPalette.join(', '), theme: profile.styleArchetype, subject: "A person reflecting urban elegance" },
-    { palette: "High Contrast", theme: `Experimental ${profile.styleArchetype}`, subject: "A bold fashion-forward individual" },
-    { palette: "Muted Earthtones", theme: `Casual ${profile.styleArchetype}`, subject: "A relaxed urban traveler" }
+    { palette: "Complementary Contrast", theme: `Cinematic ${profile.styleArchetype}`, subject: "A fashion-forward individual" }
   ];
 
   return Promise.all(variations.map(v => 
@@ -216,7 +203,7 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
     contents: {
       parts: [
         { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: 'image/jpeg' } },
-        { text: prompt },
+        { text: `${prompt}. Maintain full-body garment integrity.` },
       ],
     },
     config: { imageConfig: { aspectRatio: "3:4" } }
@@ -224,40 +211,34 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
 
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
-      const mimeType = part.inlineData.mimeType || 'image/png';
-      return `data:${mimeType};base64,${part.inlineData.data}`;
+      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("No image data found.");
+  throw new Error("Edit failed.");
 };
 
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const displayTemp = convertTemp(weather.temp, unit);
-  const prompt = `Cinematic photo of ${weather.location} at ${displayTemp}°${unit}. Wide-angle fashion landscape. No text. Photorealistic.`;
+  const prompt = `Cinematic photo of ${weather.location} at ${displayTemp}°${unit}. Wide-angle fashion landscape. High-end lighting.`;
   
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "16:9" } }
-    });
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: { parts: [{ text: prompt }] },
+    config: { imageConfig: { aspectRatio: "16:9" } }
+  });
 
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        const detectedMimeType = part.inlineData.mimeType || 'image/png';
-        return `data:${detectedMimeType};base64,${part.inlineData.data}`;
-      }
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
     }
-    throw new Error("No image data.");
-  } catch (err: any) {
-    throw err;
   }
+  throw new Error("Hero generation failed.");
 };
 
 export const getPlanRecommendations = async (location: string, outfit: OutfitSuggestion, lat: number, lon: number): Promise<{ text: string, links: GroundingLink[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Recommend grounded locations in ${location} for: Explore (${outfit.activity}), Eat (${outfit.coffeeSpot}), Shop (${outfit.storeType}).`;
+  const prompt = `Grounded locations in ${location} for: Explore (${outfit.activity}), Eat (${outfit.coffeeSpot}), Shop (${outfit.storeType}). Focus on high-fashion accessibility.`;
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,

@@ -31,7 +31,8 @@ import {
   AlertCircle,
   Wind,
   Thermometer,
-  CloudRain
+  CloudRain,
+  Layers
 } from 'lucide-react';
 
 interface StylePersona {
@@ -115,7 +116,6 @@ const StylistTab: React.FC<Props> = ({
       const data = await response.json();
       setSuggestions(data.results || []);
     } catch (err) {
-      console.error("Geocoding fetch failed", err);
       setSuggestions([]);
     }
   };
@@ -145,7 +145,7 @@ const StylistTab: React.FC<Props> = ({
       onHeroUpdate(hero);
       setIsLocationExpanded(false);
     } catch (err: any) {
-      setError("Atmospheric sync failed. Try a different city.");
+      setError("Atmospheric sync failed.");
     } finally {
       setLoading(false);
     }
@@ -156,12 +156,10 @@ const StylistTab: React.FC<Props> = ({
     if (!locationInput) return;
     setLoading(true);
     setError(null);
-    const query = locationInput;
-    setSuggestions([]); 
     try {
-      const coords = await geocode(query);
+      const coords = await geocode(locationInput);
       if (!coords) throw new Error("City not found");
-      const weatherData = await fetchWeather(coords.lat, coords.lon, query);
+      const weatherData = await fetchWeather(coords.lat, coords.lon, locationInput);
       onWeatherUpdate(weatherData);
       const [suggestion, hero] = await Promise.all([
         getOutfitSuggestion(weatherData, styleContext, unit),
@@ -180,11 +178,6 @@ const StylistTab: React.FC<Props> = ({
   const handleDetectLocation = () => {
     setIsLocating(true);
     setError(null);
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported.");
-      setIsLocating(false);
-      return;
-    }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -205,11 +198,10 @@ const StylistTab: React.FC<Props> = ({
           setIsLocating(false);
         }
       },
-      (err) => {
+      () => {
         setError("Location access denied.");
         setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      }
     );
   };
 
@@ -253,7 +245,6 @@ const StylistTab: React.FC<Props> = ({
     </AnimatePresence>
   );
 
-  // Onboarding View
   if (!weather && !loading && !isLocating) {
     return (
       <div className="min-h-[70dvh] flex flex-col items-center justify-center p-6 space-y-8 animate-in fade-in duration-700">
@@ -261,9 +252,6 @@ const StylistTab: React.FC<Props> = ({
           <div className="bg-indigo-600 p-6 rounded-[2.5rem] shadow-2xl shadow-indigo-100">
             <Cloud className="text-white w-12 h-12" />
           </div>
-          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 3 }}
-            className="absolute -top-2 -right-2 bg-indigo-400 w-6 h-6 rounded-full blur-xl"
-          />
         </div>
         <div className="text-center space-y-3">
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Welcome to Aura</h1>
@@ -276,11 +264,6 @@ const StylistTab: React.FC<Props> = ({
             {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4 fill-white" />}
             {isLocating ? "Syncing GPS..." : "Near Me"}
           </button>
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-gray-100"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">or</span>
-            <div className="flex-grow border-t border-gray-100"></div>
-          </div>
           <form onSubmit={handleManualSearch} className="relative z-[100]">
             <input type="text" value={locationInput} onChange={handleInputChange} placeholder="Search City..."
               className="w-full bg-white border-2 border-indigo-50 rounded-[2rem] px-6 py-4 text-sm font-black text-gray-950 placeholder:text-gray-300 outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-200 transition-all shadow-sm"
@@ -297,7 +280,6 @@ const StylistTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-6 pb-12 overflow-x-hidden">
-      {/* Visual Hero Card */}
       <div className="relative w-full aspect-[21/9] bg-gray-100 rounded-[1.75rem] overflow-hidden shadow-sm border border-gray-100 shrink-0">
         {(weatherHero && !loading && !isLocating) ? (
           <>
@@ -306,14 +288,8 @@ const StylistTab: React.FC<Props> = ({
               <div className="text-white flex items-end justify-between">
                 <p className="text-2xl font-black tracking-tighter leading-none opacity-90">{getDisplayTemp(weather!.temp)}°{unit}</p>
                 <div className="flex gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <Wind className="w-3 h-3 opacity-60" />
-                    <p className="text-[10px] font-black">{weather!.wind}k</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CloudRain className="w-3 h-3 opacity-60" />
-                    <p className="text-[10px] font-black">{weather!.precip}m</p>
-                  </div>
+                  <div className="flex items-center gap-1.5"><Wind className="w-3 h-3 opacity-60" /><p className="text-[10px] font-black">{weather!.wind}k</p></div>
+                  <div className="flex items-center gap-1.5"><CloudRain className="w-3 h-3 opacity-60" /><p className="text-[10px] font-black">{weather!.precip}m</p></div>
                 </div>
               </div>
             </div>
@@ -326,7 +302,6 @@ const StylistTab: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Mood Carousel */}
       <div className="space-y-4 pt-1 relative overflow-hidden">
         <h3 className="px-5 text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Style Persona</h3>
         <div className="flex gap-3 overflow-x-auto py-2 scrollbar-hide px-5 snap-x">
@@ -351,8 +326,6 @@ const StylistTab: React.FC<Props> = ({
 
       {currentOutfit && weather && (
         <div className="px-5 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          
-          {/* Header & Context Summary */}
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[8px] font-black text-indigo-600 uppercase tracking-[0.2em]">Current Aura</span>
@@ -377,105 +350,55 @@ const StylistTab: React.FC<Props> = ({
                 {activePersona.name} • {getDisplayTemp(weather.temp)}°{unit}
               </p>
             </div>
-            <button 
-              // Fix truthiness check error by using explicit block instead of || 
-              onClick={() => {
-                if (onFitCheck) {
-                  onFitCheck();
-                } else {
-                  onTabChange(AppTab.VISUALIZE);
-                }
-              }} 
-              className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-lg active:scale-95 group transition-all"
-            >
+            <button onClick={() => onFitCheck ? onFitCheck() : onTabChange(AppTab.VISUALIZE)} className="bg-gray-900 text-white px-4 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-lg active:scale-95 group transition-all">
               <Camera className="w-4 h-4 group-hover:rotate-12 transition-transform" />
               <span className="text-[10px] font-black uppercase tracking-widest">Fit Check</span>
             </button>
           </div>
 
-          {/* New Narrative Block - Placed on Top of Fit */}
           <div className="bg-indigo-600 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
             <Sparkles className="absolute -top-4 -right-4 w-20 h-20 opacity-10" />
             <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Weather Story</p>
-            <p className="text-xs font-bold leading-relaxed tracking-tight">
-              {currentOutfit.weatherStory}
-            </p>
+            <p className="text-xs font-bold leading-relaxed tracking-tight">{currentOutfit.weatherStory}</p>
           </div>
 
-          {/* The Fit Block - Compacted to show in viewport */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <div className="h-[1px] flex-1 bg-gray-100" />
-              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Fit</span>
-              <div className="h-[1px] flex-1 bg-gray-100" />
+              <div className="h-[1px] flex-1 bg-gray-100" /><span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Fit</span><div className="h-[1px] flex-1 bg-gray-100" />
             </div>
             
             <div className="grid grid-cols-1 gap-4">
               <VerdictItem icon={<Shirt className="w-5 h-5" />} label="Outerwear" value={currentOutfit.outerwear} accent="indigo" />
               <VerdictItem icon={<Zap className="w-5 h-5" />} label="Base Layer" value={currentOutfit.baseLayer} accent="indigo" />
+              <VerdictItem icon={<Layers className="w-5 h-5" />} label="Lower Body" value={currentOutfit.lowerBody} accent="indigo" />
               <VerdictItem icon={<Footprints className="w-5 h-5" />} label="Footwear" value={currentOutfit.footwear} accent="indigo" />
             </div>
           </div>
 
-          {/* Split Block: Technical Logic & Pro Tip */}
           <div className="grid grid-cols-1 gap-4">
             <div className="bg-white border border-gray-100 p-5 rounded-[2rem] shadow-sm">
               <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Stylist Reasoning</p>
-              <p className="text-[11px] font-bold text-gray-600 leading-relaxed uppercase tracking-tight">
-                {currentOutfit.styleReasoning}
-              </p>
+              <p className="text-[11px] font-bold text-gray-600 leading-relaxed uppercase tracking-tight">{currentOutfit.styleReasoning}</p>
             </div>
             <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-[1.5rem] flex items-center gap-3">
               <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
-              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-900 leading-tight">
-                Pro Tip: {currentOutfit.proTip}
-              </p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-900 leading-tight">Pro Tip: {currentOutfit.proTip}</p>
             </div>
           </div>
-
-          {/* Explore Button */}
-          <button 
-            onClick={() => onTabChange(AppTab.PLAN)}
-            className="w-full py-5 bg-white border border-indigo-100 rounded-[2rem] flex items-center justify-center gap-3 active:scale-95 transition-all group"
-          >
-            <Compass className="w-4 h-4 text-indigo-600 group-hover:rotate-45 transition-transform" />
-            <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Explore Your Plan for Today</span>
-          </button>
         </div>
       )}
     </div>
   );
 };
 
-interface VerdictItemProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  accent: "indigo" | "emerald" | "amber" | "rose";
-  onAction?: () => void;
-}
-
-const VerdictItem: React.FC<VerdictItemProps> = ({ icon, label, value, accent, onAction }) => {
-  const colors = {
-    indigo: "text-indigo-600 bg-indigo-50",
-    emerald: "text-emerald-600 bg-emerald-50",
-    amber: "text-amber-600 bg-amber-50",
-    rose: "text-rose-600 bg-rose-50",
-  };
-
-  return (
-    <div className="flex items-center gap-4 group" onClick={onAction}>
-      <div className={`p-3 rounded-2xl shrink-0 transition-transform duration-300 group-hover:scale-110 ${colors[accent]}`}>
-        {icon}
-      </div>
-      <div className="flex-1 space-y-0.5">
-        <div className="flex items-center justify-between">
-          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
-        </div>
-        <h4 className="text-[13px] font-black text-gray-900 leading-tight uppercase tracking-tight line-clamp-2">{value}</h4>
-      </div>
+const VerdictItem: React.FC<{ icon: React.ReactNode; label: string; value: string; accent: "indigo" }> = ({ icon, label, value, accent }) => (
+  <div className="flex items-center gap-4 group">
+    <div className="p-3 rounded-2xl shrink-0 transition-transform duration-300 group-hover:scale-110 text-indigo-600 bg-indigo-50">{icon}</div>
+    <div className="flex-1 space-y-0.5">
+      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
+      <h4 className="text-[13px] font-black text-gray-900 leading-tight uppercase tracking-tight line-clamp-2">{value}</h4>
     </div>
-  );
-};
+  </div>
+);
 
 export default StylistTab;
