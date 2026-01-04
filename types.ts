@@ -15,7 +15,7 @@ export interface OutfitSuggestion {
   footwear: string;
   proTip: string;
   styleReasoning: string;
-  weatherStory: string; // New field for the atmospheric narrative
+  tagline: string; // 4-word inspirational tagline
   // New Lifestyle Fields
   activity: string;
   coffeeSpot: string;

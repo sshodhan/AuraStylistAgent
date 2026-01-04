@@ -16,7 +16,7 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
 
     Suggest:
     1. A 3-piece outfit (Base, Outerwear, Shoes).
-    2. A "Weather Story": A very short (2 sentences max), inspirational narrative about today's atmosphere and an activity the user should feel inspired to do. 
+    2. A "Tagline": Exactly a 4-word inspirational tagline for the day to inspire people based on the vibe and weather. (e.g., "CHASE THE GOLDEN HOUR").
     3. "Style Reasoning": Technical explanation of why this specific outfit works for the weather.
     4. A "Fun Activity" optimized for this vibe.
     5. A "Coffee/Dining Vibe".
@@ -41,12 +41,12 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
           footwear: { type: Type.STRING },
           proTip: { type: Type.STRING },
           styleReasoning: { type: Type.STRING },
-          weatherStory: { type: Type.STRING },
+          tagline: { type: Type.STRING },
           activity: { type: Type.STRING },
           coffeeSpot: { type: Type.STRING },
           storeType: { type: Type.STRING },
         },
-        required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
+        required: ["baseLayer", "outerwear", "footwear", "proTip", "styleReasoning", "tagline", "activity", "coffeeSpot", "storeType"]
       }
     }
   });
@@ -69,12 +69,12 @@ export const generateEmailDigest = async (weather: WeatherData, outfit: OutfitSu
     Tip: ${outfit.proTip}
   `;
 
+  // Fix: Avoid setting maxOutputTokens without a thinkingBudget as per coding guidelines for Gemini 3 series models.
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
       temperature: 0.7,
-      maxOutputTokens: 500,
     }
   });
 
