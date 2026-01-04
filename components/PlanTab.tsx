@@ -19,7 +19,9 @@ import {
   ArrowRight,
   Zap,
   Waves,
-  Map as MapIcon
+  Map as MapIcon,
+  ChevronDown,
+  Info
 } from 'lucide-react';
 
 interface Props {
@@ -28,23 +30,67 @@ interface Props {
   onTabChange: (tab: AppTab) => void;
 }
 
-// Helper to render basic markdown-like bolding
-const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
-  const parts = text.split(/(\*\*\*.*?\*\*\*|\*\*.*?\*\*)/g);
+// Enhanced Markdown-like parser for the Strategy section
+const StrategyFormatter: React.FC<{ text: string, inverse?: boolean }> = ({ text, inverse = false }) => {
+  // Split into lines and process structured patterns
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l !== '');
+  
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('**')) {
-          const clean = part.replace(/\*/g, '');
-          return <span key={i} className="font-black text-indigo-900">{clean}</span>;
+    <div className="space-y-5">
+      {lines.map((line, idx) => {
+        // Detect if it's a list item (e.g., "1. ", "• ")
+        const isListItem = /^\d+\.\s|^\*\s|^•\s|^- \s/.test(line);
+        const cleanLine = line.replace(/^\d+\.\s|^\*\s|^•\s|^- \s/, '');
+        
+        // Handle bolding within the line
+        const parts = cleanLine.split(/(\*\*\*.*?\*\*\*|\*\*.*?\*\*)/g);
+        
+        const content = (
+          <span className={`text-sm font-bold leading-relaxed tracking-tight ${inverse ? 'text-indigo-50/90' : 'text-gray-700'}`}>
+            {parts.map((part, i) => {
+              if (part.startsWith('**')) {
+                const clean = part.replace(/\*/g, '');
+                return (
+                  <span key={i} className={`font-black ${inverse ? 'text-indigo-300 underline decoration-indigo-500/30' : 'text-indigo-900'} underline-offset-4`}>
+                    {clean}
+                  </span>
+                );
+              }
+              return part;
+            })}
+          </span>
+        );
+
+        if (isListItem) {
+          return (
+            <motion.div 
+              key={idx} 
+              initial={{ opacity: 0, x: -5 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              transition={{ delay: idx * 0.05 }}
+              className="flex gap-4 items-start"
+            >
+              <div className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${inverse ? 'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]' : 'bg-indigo-600'}`} />
+              {content}
+            </motion.div>
+          );
         }
-        return part;
+
+        return (
+          <motion.p 
+            key={idx}
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }}
+            className={`text-sm leading-relaxed ${inverse ? 'text-indigo-50/80 font-medium' : 'text-gray-600 font-medium italic'}`}
+          >
+            {content}
+          </motion.p>
+        );
       })}
-    </>
+    </div>
   );
 };
 
-// Interface for localized recommendations with coordinates
 interface LocalizedGem extends GroundingLink {
   lat: number;
   lon: number;
@@ -58,19 +104,17 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'eat' | 'explore' | 'shop'>('all');
   const [activeGemId, setActiveGemId] = useState<string | null>(null);
+  const [isStrategyExpanded, setIsStrategyExpanded] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
-
     const initialLat = weather?.coords?.lat || 47.6062;
     const initialLon = weather?.coords?.lon || -122.3321;
     
-    // Initial Zoom set to 14 (previously 12) for enhanced detail while maintaining some context
     mapInstanceRef.current = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
@@ -90,27 +134,22 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
     };
   }, []);
 
-  // Fetch recommendations and simulate spatial grounding
   const fetchPlan = async () => {
     if (!weather || !outfit) return;
     setLoading(true);
     setError(null);
-    
     const baseLat = weather.coords?.lat || 47.6062;
     const baseLon = weather.coords?.lon || -122.3321;
 
     try {
       const result = await getPlanRecommendations(weather.location, outfit, baseLat, baseLon);
       setRecommendations(result.text);
-      
-      // Assign localized coordinates for grounded links
       const localized = result.links.map((link, idx) => ({
         ...link,
         id: `gem-${idx}`,
         lat: baseLat + (Math.random() - 0.5) * 0.03,
         lon: baseLon + (Math.random() - 0.5) * 0.03,
       }));
-      
       setGems(localized);
     } catch (err) {
       setError("Grounding search failed. Try again.");
@@ -125,7 +164,6 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
     }
   }, [outfit, weather]);
 
-  // Update Markers based on Filter
   const filteredGems = useMemo(() => {
     return activeFilter === 'all' ? gems : gems.filter(g => g.type === activeFilter);
   }, [gems, activeFilter]);
@@ -139,7 +177,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
       const iconHtml = `
         <div class="relative flex items-center justify-center transition-all duration-300 ${isSelected ? 'scale-125' : 'scale-100'}">
           ${isSelected ? '<div class="absolute w-10 h-10 bg-indigo-500/30 rounded-full animate-ping"></div>' : ''}
-          <div class="w-8 h-8 ${isSelected ? 'bg-indigo-600' : 'bg-white'} rounded-2xl shadow-xl flex items-center justify-center border-2 border-indigo-600/10 z-10">
+          <div class="w-8 h-8 ${isSelected ? 'bg-indigo-600 shadow-[0_0_15px_rgba(79,70,229,0.4)]' : 'bg-white shadow-lg'} rounded-2xl flex items-center justify-center border-2 border-indigo-600/10 z-10">
             ${gem.type === 'eat' ? '<span class="text-xs">☕</span>' : 
               gem.type === 'explore' ? '<span class="text-xs">🧭</span>' : 
               '<span class="text-xs">🛍️</span>'}
@@ -158,7 +196,6 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
       marker.on('click', () => handleLocateGem(gem));
     });
 
-    // Auto-fit bounds with balanced padding
     if (filteredGems.length > 0) {
       const bounds = L.latLngBounds(filteredGems.map(g => [g.lat, g.lon]));
       mapInstanceRef.current.flyToBounds(bounds, { padding: [60, 60], duration: 1.5 });
@@ -167,24 +204,16 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
 
   const handleLocateGem = (gem: LocalizedGem) => {
     setActiveGemId(gem.id);
-    
-    // Smoothly scroll the map into the center of the viewport to solve accessibility issue
     if (mapContainerRef.current) {
       mapContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
     if (mapInstanceRef.current) {
-      // Zoom 15 (previously 13) for a more detailed neighborhood view
-      mapInstanceRef.current.flyTo([gem.lat, gem.lon], 15, {
-        duration: 1.2,
-        easeLinearity: 0.25
-      });
+      mapInstanceRef.current.flyTo([gem.lat, gem.lon], 15, { duration: 1.2 });
     }
   };
 
   const handleRecenter = () => {
     if (weather?.coords && mapInstanceRef.current) {
-      // Recenter to zoom 14 (previously 12)
       mapInstanceRef.current.flyTo([weather.coords.lat, weather.coords.lon], 14, { duration: 1 });
       setActiveGemId(null);
     }
@@ -204,9 +233,9 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
   }
 
   return (
-    <div className="flex flex-col space-y-6 pb-4 animate-in fade-in duration-500">
+    <div className="flex flex-col space-y-6 pb-12 animate-in fade-in duration-500">
       
-      {/* Plan Summary Section */}
+      {/* Plan Brief Cards */}
       <div className="px-2 space-y-4">
         <div className="flex items-center justify-between">
            <h2 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">The Plan Brief</h2>
@@ -223,11 +252,10 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
         </div>
       </div>
 
-      {/* Enhanced Map Section with Integrated Overlays */}
+      {/* Map Module */}
       <div className="relative h-[340px] shrink-0 rounded-[3rem] overflow-hidden border border-gray-100 shadow-2xl bg-gray-50 mx-1">
         <div ref={mapContainerRef} className="h-full w-full" id="aura-map-container" />
         
-        {/* Top Overlay: Category Filter Pills */}
         <div className="absolute top-4 inset-x-4 z-[1000] flex justify-between items-center pointer-events-none">
           <div className="flex gap-1.5 pointer-events-auto overflow-x-auto scrollbar-hide pb-1 pr-4">
              <MapChip active={activeFilter === 'all'} onClick={() => setActiveFilter('all')}>All Gems</MapChip>
@@ -235,15 +263,11 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
              <MapChip active={activeFilter === 'explore'} onClick={() => setActiveFilter('explore')}>Explore</MapChip>
              <MapChip active={activeFilter === 'shop'} onClick={() => setActiveFilter('shop')}>Shop</MapChip>
           </div>
-          <button 
-            onClick={handleRecenter} 
-            className="p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 active:scale-95 transition-all pointer-events-auto shrink-0"
-          >
+          <button onClick={handleRecenter} className="p-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/40 text-indigo-600 active:scale-95 transition-all pointer-events-auto shrink-0">
             <Crosshair className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Bottom Overlay: The Gems Carousel */}
         <div className="absolute bottom-6 inset-x-0 z-[1000] pointer-events-none">
           <div className="flex flex-col gap-3">
              <div className="flex items-center justify-between px-6">
@@ -293,9 +317,8 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
         </div>
       </div>
 
-      {/* Detailed Itinerary Reasoning and Lists */}
-      <div className="px-2 space-y-10 pb-12">
-        
+      {/* Itinerary Logic & Details */}
+      <div className="px-2 space-y-10">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
              <div className="relative">
@@ -303,30 +326,59 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
                 <Navigation className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400 animate-pulse" />
              </div>
              <div className="text-center space-y-1">
-                <p className="text-[11px] font-black uppercase text-gray-900 tracking-widest">Spatial Intelligence Active</p>
-                <p className="text-[9px] font-medium text-gray-400 uppercase">Synchronizing itinerary with Google Maps...</p>
+                <p className="text-[11px] font-black uppercase text-gray-900 tracking-widest">Aura Intelligence Active</p>
+                <p className="text-[9px] font-medium text-gray-400 uppercase">Grounding itinerary in real-time data...</p>
              </div>
           </div>
         ) : (
           <>
-            {/* Itinerary Logic Block */}
+            {/* Itinerary Strategy Card - Collapsible */}
             {recommendations && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-950 p-8 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden mx-1">
-                <Waves className="absolute -bottom-10 -left-10 w-48 h-48 opacity-10 text-indigo-500" />
-                <div className="flex items-center gap-3 mb-6">
-                   <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20">
-                      <Sparkles className="w-4 h-4 text-white" />
-                   </div>
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">Itinerary Strategy</h4>
-                </div>
-                <p className="text-sm font-bold leading-relaxed tracking-tight italic text-indigo-50">
-                  <SimpleMarkdown text={recommendations} />
-                </p>
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                className="bg-gray-950 rounded-[3.5rem] shadow-2xl relative overflow-hidden mx-1"
+              >
+                <button 
+                  onClick={() => setIsStrategyExpanded(!isStrategyExpanded)}
+                  className="w-full p-8 flex items-center justify-between text-left group relative z-10"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+                        <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 mb-0.5">Itinerary Strategy</h4>
+                      <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Click to {isStrategyExpanded ? 'Collapse' : 'Expand'} logic</p>
+                    </div>
+                  </div>
+                  <div className={`p-2 rounded-xl bg-white/5 border border-white/10 transition-transform duration-500 ${isStrategyExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                    <ChevronDown className="w-4 h-4 text-white" />
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isStrategyExpanded && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.5, ease: "circOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-8 pb-10 relative">
+                        <Waves className="absolute -bottom-10 -right-10 w-48 h-48 opacity-[0.03] text-indigo-500 pointer-events-none" />
+                        <div className="h-[1px] w-full bg-white/10 mb-8" />
+                        <StrategyFormatter text={recommendations} inverse />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
             {/* Comprehensive Destination Lists */}
-            <div className="space-y-12">
+            <div className="space-y-12 pb-12">
                <DestinationSection title="Eat & Drink" type="eat" gems={gems} onLocate={handleLocateGem} />
                <DestinationSection title="Explore & Play" type="explore" gems={gems} onLocate={handleLocateGem} />
                <DestinationSection title="Shop & Browse" type="shop" gems={gems} onLocate={handleLocateGem} />
@@ -345,7 +397,7 @@ const PlanTab: React.FC<Props> = ({ weather, outfit, onTabChange }) => {
   );
 };
 
-// UI Components
+// UI Atoms
 const MapChip: React.FC<{ active: boolean; children: React.ReactNode; onClick: () => void }> = ({ active, children, onClick }) => (
   <button 
     onClick={onClick}
