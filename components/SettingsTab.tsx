@@ -150,7 +150,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 placeholder="What should Aura call you?"
-                className="w-full bg-transparent border-none outline-none text-sm font-black text-gray-900 p-0" 
+                className="w-full bg-transparent border-none outline-none text-sm font-black text-black p-0" 
               />
             </div>
           </div>
@@ -165,7 +165,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                 value={emailAddress}
                 onChange={(e) => setEmailAddress(e.target.value)}
                 placeholder="fashion@aura.com"
-                className="w-full bg-transparent border-none outline-none text-sm font-black text-gray-900 p-0" 
+                className="w-full bg-transparent border-none outline-none text-sm font-black text-black p-0" 
               />
             </div>
           </div>
@@ -191,7 +191,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
               type="time" 
               value={sendTime}
               onChange={(e) => setSendTime(e.target.value)}
-              className="bg-gray-100 border-none rounded-lg px-2 py-1 text-xs font-black outline-none" 
+              className="bg-gray-100 border-none rounded-lg px-2 py-1 text-xs font-black text-black outline-none" 
             />
           </div>
         </div>
@@ -312,8 +312,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20" />
                       </div>
                     )}
-                    <div className="p-8 text-xs font-medium leading-loose whitespace-pre-wrap italic text-gray-600 relative">
-                      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 opacity-20" />
+                    <div className="p-8 text-xs font-medium leading-loose whitespace-pre-wrap italic text-gray-600 relative border-t-4 border-indigo-600">
                       {digestContent}
                     </div>
                   </div>

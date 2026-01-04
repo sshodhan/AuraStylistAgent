@@ -145,7 +145,7 @@ const StylistTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-3 pb-4">
-      {/* Clean Hero Header - Content moved to App Header */}
+      {/* Clean Hero Header */}
       <div className="relative w-full aspect-[21/10] bg-gray-100 rounded-[1.5rem] overflow-hidden shadow-sm border border-gray-100 shrink-0">
         {(weatherHero && !loading) ? (
           <>
@@ -251,7 +251,7 @@ const StylistTab: React.FC<Props> = ({
                           value={locationInput}
                           onChange={(e) => setLocationInput(e.target.value)}
                           placeholder="Search..."
-                          className="w-full pl-7 pr-2 py-1.5 bg-gray-50 border border-indigo-100 rounded-lg outline-none text-[10px] font-bold"
+                          className="w-full pl-7 pr-2 py-1.5 bg-white border border-indigo-200 rounded-lg outline-none text-[11px] font-black text-black shadow-inner"
                         />
                       </div>
                       <button
