@@ -32,6 +32,7 @@ export enum AppTab {
 export interface GroundingLink {
   uri: string;
   title: string;
+  reason?: string;
   coords?: { lat: number; lon: number };
   type?: 'eat' | 'explore' | 'shop';
 }

@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeatherData, OutfitSuggestion, GroundingLink } from '../types';
-import { getStoreLocations } from '../services/geminiService';
+// Fix: Import getPlanRecommendations instead of the non-existent getStoreLocations
+import { getPlanRecommendations } from '../services/geminiService';
 import { MapPin, ExternalLink, Loader2, ShoppingBag, Navigation, AlertCircle, Maximize2, Crosshair, ChevronDown, Sparkles, BookOpen } from 'lucide-react';
 
 interface Props {
@@ -99,7 +100,8 @@ const StoresTab: React.FC<Props> = ({ weather, outfit }) => {
     const lon = weather.coords?.lon || -122.3321;
 
     try {
-      const result = await getStoreLocations(weather.location, outfit.outerwear || outfit.baseLayer, lat, lon);
+      // Fix: Updated call to use getPlanRecommendations with the full outfit object as required by the service
+      const result = await getPlanRecommendations(weather.location, outfit, lat, lon);
       setRecommendations(result.text);
       setLinks(result.links);
     } catch (err) {

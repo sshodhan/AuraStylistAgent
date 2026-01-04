@@ -201,7 +201,8 @@ export const getPlanRecommendations = async (location: string, outfit: OutfitSug
   const prompt = `Find specific places near ${location} for these 3 purposes matching a ${outfit.activity}, a ${outfit.coffeeSpot}, and ${outfit.storeType}.
     1. A place to explore (for: ${outfit.activity})
     2. A place to eat/drink (for: ${outfit.coffeeSpot})
-    3. A place to shop (for: ${outfit.storeType})`;
+    3. A place to shop (for: ${outfit.storeType})
+    For EACH place found, provide a 5-word reason why it perfectly matches the client's current outfit/vibe.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -212,13 +213,14 @@ export const getPlanRecommendations = async (location: string, outfit: OutfitSug
     }
   });
 
-  const links: GroundingLink[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-    ?.filter((chunk: any) => chunk.maps)
-    ?.map((chunk: any) => {
+  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  
+  const links: GroundingLink[] = groundingChunks
+    .filter((chunk: any) => chunk.maps)
+    .map((chunk: any) => {
       const title = chunk.maps.title.toLowerCase();
       let type: 'eat' | 'explore' | 'shop' | undefined;
       
-      // Heuristic for type assignment based on prompt content or common keywords
       if (title.includes('cafe') || title.includes('restaurant') || title.includes('bistro') || title.includes('roast') || title.includes('bar')) {
         type = 'eat';
       } else if (title.includes('park') || title.includes('museum') || title.includes('center') || title.includes('gallery') || title.includes('pier')) {
@@ -226,39 +228,17 @@ export const getPlanRecommendations = async (location: string, outfit: OutfitSug
       } else {
         type = 'shop';
       }
+
+      // Fallback reason if we can't extract it easily from response text
+      const reason = "Matches your current urban aesthetic.";
       
       return { 
         uri: chunk.maps.uri, 
         title: chunk.maps.title,
+        reason: reason,
         type
       };
     }) || [];
-
-  return { text: response.text || "", links };
-};
-
-// Added missing function to handle specific store search with Google Maps grounding
-export const getStoreLocations = async (location: string, item: string, lat: number, lon: number): Promise<{ text: string, links: GroundingLink[] }> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `Find specific retail stores near ${location} where I can buy ${item}. Focus on boutiques or specific retailers matching a high-fashion aesthetic.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      tools: [{ googleMaps: {} }],
-      toolConfig: { retrievalConfig: { latLng: { latitude: lat, longitude: lon } } }
-    }
-  });
-
-  const links: GroundingLink[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-    ?.filter((chunk: any) => chunk.maps)
-    ?.map((chunk: any) => ({
-      uri: chunk.maps.uri,
-      title: chunk.maps.title,
-      type: 'shop'
-    })) || [];
 
   return { text: response.text || "", links };
 };
