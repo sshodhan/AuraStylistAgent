@@ -26,7 +26,8 @@ import {
   PartyPopper,
   MapPin,
   ChevronDown,
-  X
+  X,
+  Pencil
 } from 'lucide-react';
 
 interface StylePersona {
@@ -250,7 +251,7 @@ const StylistTab: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Enhanced Compact Tactile Mood Carousel */}
+      {/* Enhanced Compact Mood Carousel */}
       <div className="space-y-4 pt-4 relative overflow-hidden">
         <h3 className="px-5 text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none">Style Persona</h3>
         
@@ -287,7 +288,6 @@ const StylistTab: React.FC<Props> = ({
                   }`}
                   style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
                 >
-                  {/* Emoji bubble that appears on hover or selection */}
                   <AnimatePresence>
                     {(isHovered || isActive) && (
                       <motion.div
@@ -304,19 +304,16 @@ const StylistTab: React.FC<Props> = ({
                     )}
                   </AnimatePresence>
 
-                  {/* Icon */}
                   <div className={`p-1.5 rounded-xl mb-1 transition-colors duration-300 ${isActive ? 'bg-white/20' : 'bg-gray-50'}`}>
                     <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
                   </div>
 
-                  {/* Name */}
                   <div className="text-center flex flex-col px-1 leading-none">
                     <span className={`text-[8px] font-black uppercase tracking-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-900'}`}>
                       {persona.name}
                     </span>
                   </div>
 
-                  {/* Selection Checkmark */}
                   {isActive && (
                      <div className="absolute -top-1 -right-1 animate-in zoom-in duration-300">
                        <div className="bg-white rounded-full p-0.5 shadow-md border border-indigo-100">
@@ -325,7 +322,6 @@ const StylistTab: React.FC<Props> = ({
                      </div>
                   )}
 
-                  {/* Sparkle effects on selected */}
                   {isActive && (
                     <>
                       <motion.div
@@ -364,7 +360,6 @@ const StylistTab: React.FC<Props> = ({
                   STYLIST VERDICT
                 </span>
                 
-                {/* Location Selector/Search Container */}
                 <div className="relative">
                   {!isLocationExpanded ? (
                     <button 
@@ -372,13 +367,13 @@ const StylistTab: React.FC<Props> = ({
                         setIsLocationExpanded(true);
                         setLocationInput(weather.location);
                       }}
-                      className="flex items-center gap-1.5 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 hover:border-indigo-200 transition-all active:scale-95 group"
+                      className="flex items-center gap-2 bg-blue-50/40 px-3.5 py-1.5 rounded-full border-2 border-blue-600/30 hover:border-blue-600 transition-all active:scale-95 group"
                     >
-                      <MapPin className="w-3 h-3 text-indigo-600" />
-                      <span className="text-[11px] font-black text-gray-700 uppercase tracking-tight">
+                      <MapPin className="w-3 h-3 text-blue-600" />
+                      <span className="text-[11px] font-black text-blue-700 uppercase tracking-tight">
                         {weather.location}
                       </span>
-                      <ChevronDown className="w-3 h-3 text-gray-300" />
+                      <Pencil className="w-2.5 h-2.5 text-blue-400 group-hover:text-blue-600 transition-colors" />
                     </button>
                   ) : (
                     <div className="space-y-1 animate-in fade-in zoom-in-95 duration-200 z-50 relative">
@@ -412,7 +407,6 @@ const StylistTab: React.FC<Props> = ({
                         </button>
                       </form>
 
-                      {/* Typeahead Suggestions Dropdown */}
                       {(suggestions.length > 0 || isSearchingSuggestions) && (
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden z-[60]">
                           {isSearchingSuggestions && (
@@ -438,7 +432,49 @@ const StylistTab: React.FC<Props> = ({
                   )}
                 </div>
               </div>
-              <Sparkles className={`w-4 h-4 text-indigo-500 shrink-0 mt-1 ${loading ? 'animate-pulse' : ''}`} />
+              
+              {/* Fit Check Button with Sparkle Treatment */}
+              <button
+                onClick={() => onTabChange(AppTab.VISUALIZE)}
+                disabled={loading}
+                className="relative overflow-hidden bg-slate-900 text-white px-4 py-2.5 rounded-full flex items-center gap-1.5 shadow-xl active:scale-95 transition-all hover:shadow-indigo-200/50 hover:bg-black group disabled:bg-gray-300"
+              >
+                {/* Shimmer Effect */}
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12"
+                  animate={{ x: ['-150%', '150%'] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
+                />
+                
+                {/* Floating Particle Sparkles */}
+                <AnimatePresence>
+                  {[...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-0.5 h-0.5 bg-indigo-300 rounded-full pointer-events-none"
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ 
+                        opacity: [0, 1, 0], 
+                        scale: [0, 1.5, 0],
+                        x: [0, (i - 1) * 15],
+                        y: [0, -10 - (i * 5)]
+                      }}
+                      transition={{ 
+                        duration: 1.5, 
+                        repeat: Infinity, 
+                        delay: i * 0.4,
+                        ease: "easeOut"
+                      }}
+                    />
+                  ))}
+                </AnimatePresence>
+
+                <div className="relative flex items-center gap-1.5">
+                  <Camera className="w-3 h-3 text-white group-hover:rotate-12 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em]">Fit Check</span>
+                  <Sparkles className="w-2.5 h-2.5 text-indigo-300 animate-pulse" />
+                </div>
+              </button>
             </div>
             
             <div className="space-y-3 pt-2 border-t border-gray-50">
@@ -451,17 +487,6 @@ const StylistTab: React.FC<Props> = ({
               <p className="text-[10px] text-gray-500 font-medium leading-relaxed italic opacity-90 border-l-2 border-indigo-100 pl-3">
                 "{currentOutfit.proTip}"
               </p>
-            </div>
-
-            <div className="pt-1.5">
-               <button
-                onClick={() => onTabChange(AppTab.VISUALIZE)}
-                disabled={loading}
-                className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-[0.25em] hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-gray-100 disabled:bg-gray-300 border border-black"
-              >
-                <Camera className="w-3.5 h-3.5" />
-                VISUALIZE LOOK
-              </button>
             </div>
           </div>
 
