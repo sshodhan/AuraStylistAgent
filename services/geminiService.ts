@@ -10,6 +10,8 @@ const getUserProfile = (): UserProfile => {
   return {
     name: localStorage.getItem('aura_user_name') || "YOU",
     email: localStorage.getItem('aura_email_address') || "",
+    gender: localStorage.getItem('aura_gender') || "Female",
+    ageRange: localStorage.getItem('aura_age_range') || "30s",
     styleArchetype: localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist",
     preferredPalette: JSON.parse(localStorage.getItem('aura_palette') || '["Neutral Gray", "Deep Navy", "Pure White"]')
   };
@@ -28,15 +30,17 @@ export const generateVeoVideo = async (
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const profile = getUserProfile();
   onStatusUpdate?.("Initializing Veo Portrait Engine...");
 
   try {
     const startImage = imageUrls[0].split(',')[1] || imageUrls[0];
     const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
 
+    // Carrying identity context into video generation to prevent gender drift
     let operation = await ai.models.generateVideos({
       model: 'veo-3.1-fast-generate-preview',
-      prompt: `${prompt}. Ensure the lower body is clearly rendered with the specified ${imageUrls.length > 0 ? 'garments' : 'clothing'}. If shorts are worn, they must be distinct and intentional.`,
+      prompt: `${prompt}. The subject is a ${profile.gender}. Maintain strict identity consistency.`,
       image: {
         imageBytes: startImage,
         mimeType: 'image/png',
@@ -90,16 +94,18 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   
   const prompt = `
     Role: ${getUserRole()}
+    User Identity: ${profile.gender}, age ${profile.ageRange}.
     Task: Suggest a complete, high-fashion outfit for ${weather.location} at ${displayTemp}°${unit}.
+    
+    IDENTITY ALIGNMENT: You MUST suggest clothing items that align with ${profile.gender} fashion standards and ${profile.ageRange} age bracket.
     
     SAFETY & LOGIC MANDATE:
     - You MUST provide a specific "lowerBody" garment. 
     - Choices: Trousers, Chinos, Denim, Skirt, or Shorts.
     - SHORTS POLICY: Only suggest shorts if the temperature is above 20°C (68°F) or for specific athletic/relaxed contexts. 
-    - In rain or professional settings with long coats, prefer trousers to maintain aesthetic balance.
-    - Ensure the outfit is logically layered. No "naked" or missing lower-body glitches.
+    - Ensure the outfit is logically layered. No missing lower-body glitches.
 
-    Style DNA: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
+    Aesthetic: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
   `;
 
   try {
@@ -145,9 +151,14 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const profile = getUserProfile();
   
+  // IDENTITY LOCK: Strictly binding the subject description to the profile data.
+  const subjectDescription = userImage 
+    ? `the person in the reference image (who is a ${profile.gender})` 
+    : `a stylish ${profile.gender} in their ${profile.ageRange}`;
+
   const prompt = `
     EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH HEAD-TO-TOE SHOT.
-    SUBJECT: ${userImage ? 'the person in the reference' : subject}.
+    SUBJECT: ${subjectDescription}.
     THEME: ${visualVariation || profile.styleArchetype}.
     PALETTE: ${paletteHint || profile.preferredPalette.join(', ')}.
     MANDATORY GARMENTS (Must be clearly visible): 
@@ -156,8 +167,13 @@ export const generateOutfitImage = async (
     3. ${outfit.lowerBody} (Primary Lower Body - MUST RENDER CLEARLY)
     4. ${outfit.footwear}
     
-    QUALITY CONTROL: Ensure the ${outfit.lowerBody} is physically present. If shorts, show intentional leg styling. No bare-body hallucinations.
-    ATMOSPHERE: ${weather.location} street scene, ${weather.precip > 0 ? 'drizzly' : 'crisp'}.
+    QUALITY CONTROL & IDENTITY SAFETY: 
+    - Facial features, hair style, and body silhouette MUST match a ${profile.gender} subject. 
+    - DO NOT mix gender traits. 
+    - NO male face on female clothing or vice versa. 
+    - Maintain ${profile.ageRange} age maturity.
+    
+    ATMOSPHERE: ${weather.location} street scene.
   `.trim();
   
   const parts: any[] = [{ text: prompt }];
@@ -188,8 +204,8 @@ export const generateOutfitImages = async (
 ): Promise<string[]> => {
   const profile = getUserProfile();
   const variations = [
-    { palette: profile.preferredPalette.join(', '), theme: profile.styleArchetype, subject: "A person reflecting urban elegance" },
-    { palette: "Complementary Contrast", theme: `Cinematic ${profile.styleArchetype}`, subject: "A fashion-forward individual" }
+    { palette: profile.preferredPalette.join(', '), theme: profile.styleArchetype, subject: `A stylish ${profile.gender}` },
+    { palette: "Complementary Contrast", theme: `Cinematic ${profile.styleArchetype}`, subject: `A fashion-forward ${profile.gender}` }
   ];
 
   return Promise.all(variations.map(v => 
@@ -199,12 +215,13 @@ export const generateOutfitImages = async (
 
 export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const profile = getUserProfile();
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
       parts: [
         { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: 'image/jpeg' } },
-        { text: `${prompt}. Ensure garment integrity.` },
+        { text: `${prompt}. The subject is a ${profile.gender}. Maintain strict identity consistency.` },
       ],
     },
     config: { imageConfig: { aspectRatio: "3:4" } }

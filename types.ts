@@ -4,8 +4,10 @@ export type TempUnit = 'C' | 'F';
 export interface UserProfile {
   name: string;
   email: string;
-  styleArchetype: string; // e.g., "Dark Academia", "Minimalist Tech", "Vintage Boho"
-  preferredPalette: string[]; // e.g., ["#2D3436", "#636E72"]
+  gender: string; // NEW: Male, Female, Non-Binary
+  ageRange: string; // NEW: 20s, 30s, 40s, 50+
+  styleArchetype: string; 
+  preferredPalette: string[]; 
   bodyType?: string;
   seasonalVibe?: string;
 }
@@ -21,7 +23,7 @@ export interface WeatherData {
 export interface OutfitSuggestion {
   baseLayer: string;
   outerwear: string;
-  lowerBody: string; // NEW: Mandatory field to prevent "no pants" rendering errors
+  lowerBody: string; 
   footwear: string;
   proTip: string;
   styleReasoning: string;
