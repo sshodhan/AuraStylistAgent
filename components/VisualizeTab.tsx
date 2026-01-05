@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { OutfitSuggestion, WeatherData, TempUnit, AppTab, UserProfile } from '../types';
-import { generateOutfitImages, editImage, generateVeoVideo } from '../services/geminiService';
-// Added Shirt to imports from lucide-react to resolve the "Cannot find name 'Shirt'" error.
-import { Sparkles, Download, Loader2, Camera, AlertCircle, Layers, ChevronLeft, User, Image as ImageIcon, X, Zap, ChevronDown, Wand2, Send, Wand, Film, Play, Pause, RotateCw, Mic, Volume2, Shirt } from 'lucide-react';
+import { OutfitSuggestion, WeatherData, TempUnit, AppTab } from '../types';
+import { generateOutfitImages, generateVeoVideo } from '../services/geminiService';
+import { Sparkles, Download, Loader2, Camera, AlertCircle, ImageIcon, X, Zap, ChevronDown, Volume2, Mic, Film, Play, ChevronLeft, Shirt } from 'lucide-react';
 
 interface Props {
   outfit: OutfitSuggestion | null;
@@ -91,25 +90,24 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
     setShowVideoModal(true);
     
     const archetype = localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist";
+    const gender = localStorage.getItem('aura_gender') || "Female";
 
-    // RICH STYLIST PROMPT: Emphasizing Full-Body Height and Portrait Composition
+    // IDENTITY-LOCKED RUNWAY PROMPT
     const basePrompt = `
-      HIGH-END EDITORIAL FASHION CINEMATOGRAPHY.
-      SUBJECT: A full-body shot of the person in the provided reference images.
-      STYLE ARCHETYPE: ${archetype}.
-      COMPOSITION: Vertical portrait shot, full height visible from head to toe. No cropping.
-      OUTFIT FOCUS: Seamless transition showing the textures of the ${outfit?.outerwear}, ${outfit?.baseLayer}, and ${outfit?.footwear}.
-      VIBE: ${outfit?.styleReasoning}.
-      ATMOSPHERE: ${outfit?.weatherStory}.
-      MOTION: A professional high-fashion runway walk towards the camera. 
-      ${voicePrompt ? `USER COMMAND: ${voicePrompt}` : ''}
+      HIGH-END EDITORIAL RUNWAY CINEMATOGRAPHY.
+      SUBJECT: A stylish ${gender} in their 30s walking towards the camera.
+      COMPOSITION: Full-body vertical portrait (9:16).
+      STYLE: ${archetype}.
+      ENVIRONMENT: ${weather?.location} streets.
+      ${voicePrompt ? `DIRECTOR COMMAND: ${voicePrompt}` : ''}
+      MANDATORY: Ensure the subject's gender strictly remains ${gender} throughout the entire clip.
     `.trim();
 
     try {
       const url = await generateVeoVideo(imageUrls, basePrompt, (status) => setVideoStatus(status));
       setVideoUrl(url);
     } catch (err: any) {
-      setError(err.message || "Veo animation failed.");
+      setError(err.message || "Veo animation stalled. Please check API settings.");
       setShowVideoModal(false);
     } finally {
       setVideoLoading(false);
@@ -136,7 +134,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
       const urls = await generateOutfitImages(outfit, weather, size, unit, userPhoto || undefined);
       onImagesUpdate(urls);
     } catch (err: any) {
-      setError(err.message || "Generation failed.");
+      setError(err.message || "Visual synthesis encountered an atmospheric error.");
     } finally {
       setLoading(false);
     }
@@ -188,13 +186,13 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
           {isHubExpanded && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <div className="space-y-4 pt-4 text-white">
-                <h2 className="text-lg font-black tracking-tight">Personalize Your Look</h2>
+                <h2 className="text-lg font-black tracking-tight">Personalize Identity</h2>
                 <div className="pt-2">
                   {userPhoto ? (
                     <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/20">
                       <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><img src={userPhoto} alt="Ref" className="w-full h-full object-cover" /></div>
                       <div className="flex-1">
-                        <p className="text-[9px] font-black uppercase text-indigo-100">Identity Active</p>
+                        <p className="text-[9px] font-black uppercase text-indigo-100">Reference Active</p>
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); setUserPhoto(null); }} className="p-1.5"><X className="w-4 h-4 text-white" /></button>
                     </div>
@@ -214,12 +212,12 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
 
       <div className="bg-white p-5 rounded-[2.5rem] border border-gray-100 space-y-4 mx-1 shadow-sm">
         <button onClick={handleGenerate} disabled={loading} className={`w-full py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 active:scale-95 shadow-xl ${userPhoto ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-gray-900 text-white shadow-gray-200'} disabled:opacity-50`}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{userPhoto ? "Personalized Fit Check" : "Generate Range Brief"}</>}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{userPhoto ? "Apply Personal Fit" : "Generate Styled Variation"}</>}
         </button>
         
         <div className="bg-indigo-50/50 p-4 rounded-[2rem] border border-indigo-100 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Veo Motion Command</span>
+            <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Runway Motion Brief</span>
             <button onClick={handleToggleRecording} className={`p-2 rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-indigo-600 shadow-sm'}`}>
               {isRecording ? <Mic className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
             </button>
@@ -228,7 +226,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
             type="text" 
             value={voicePrompt} 
             onChange={(e) => setVoicePrompt(e.target.value)}
-            placeholder={isRecording ? "Listening..." : "Optional: Add motion command via voice or text"}
+            placeholder={isRecording ? "Listening..." : "Optional: e.g. 'Walking in soft rain'"}
             className="w-full bg-transparent text-[11px] font-bold text-indigo-900 placeholder:text-indigo-300 outline-none border-b border-indigo-100 pb-1"
           />
         </div>
@@ -248,7 +246,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
         {loading ? (
           <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-            <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Synthesizing Imagery...</p>
+            <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Synthesizing Identity...</p>
           </div>
         ) : imageUrls ? (
           <div className="space-y-8 px-1">
@@ -261,8 +259,8 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                   ))}
                 </div>
                 <div className="text-center space-y-2">
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Animate Your Fit</h3>
-                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Uses previews to synthesize portrait motion</p>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Animate Your Identity</h3>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Locked to your profile specifications</p>
                 </div>
                 <button 
                   onClick={handleGenerateVideo}
@@ -270,7 +268,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                   className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
                 >
                   <Film className="w-4 h-4" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Generate Runway Video</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Launch Runway Preview</span>
                 </button>
             </div>
 
@@ -280,7 +278,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-10 flex justify-between items-end">
                   <div className="text-white space-y-1.5">
                     <h4 className="text-[15px] font-black leading-snug max-w-[180px] uppercase tracking-tighter">
-                      Fit Preview 0{idx + 1}
+                      Persona Check 0{idx + 1}
                     </h4>
                   </div>
                   <div className="flex gap-2">
@@ -295,7 +293,7 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
         ) : (
           <div className="mx-1 aspect-[3/4] bg-gray-50 rounded-[3rem] flex flex-col items-center justify-center p-12 text-center space-y-4 opacity-40 border border-gray-100">
             <Camera className="w-10 h-10 text-gray-300" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Render today's styling verdict into high-fidelity imagery.</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Lock your identity core in settings to begin personalized synthesis.</p>
           </div>
         )}
       </div>
@@ -332,14 +330,9 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
                     <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-indigo-400 animate-pulse" />
                   </div>
                   <div className="space-y-3">
-                    <p className="text-lg font-black text-white uppercase tracking-tighter">Dreaming Fit</p>
+                    <p className="text-lg font-black text-white uppercase tracking-tighter">Dreaming Runway</p>
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">
                       {videoStatus || "Initializing Aura Portrait Engine..."}
-                    </p>
-                  </div>
-                  <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 w-full">
-                    <p className="text-[9px] text-gray-400 font-medium italic leading-relaxed">
-                      "Aura is generating a full-body runway showcase. This takes ~2 minutes to ensure cinematic vertical fidelity."
                     </p>
                   </div>
                 </div>
@@ -356,8 +349,8 @@ const VisualizeTab: React.FC<Props> = ({ outfit, weather, unit, imageUrls, onIma
               ) : (
                 <div className="h-full w-full flex flex-col items-center justify-center p-12 text-center space-y-4">
                    <AlertCircle className="w-10 h-10 text-rose-500" />
-                   <p className="text-[10px] font-black text-white uppercase tracking-widest">Generation Stalled</p>
-                   <button onClick={handleGenerateVideo} className="px-6 py-3 bg-white text-black rounded-xl font-black text-[9px] uppercase tracking-widest">Retry Animation</button>
+                   <p className="text-[10px] font-black text-white uppercase tracking-widest">Synthesis Stalled</p>
+                   <button onClick={handleGenerateVideo} className="px-6 py-3 bg-white text-black rounded-xl font-black text-[9px] uppercase tracking-widest">Retry Render</button>
                 </div>
               )}
             </div>

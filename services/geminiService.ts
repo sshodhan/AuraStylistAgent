@@ -4,7 +4,7 @@ import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile } f
 
 const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
 
-const getUserRole = (): string => "Professional Fashion Stylist and Quality Assurance Agent";
+const getUserRole = (): string => "Professional Fashion Stylist and Identity Consistency Expert";
 
 const getUserProfile = (): UserProfile => {
   return {
@@ -17,11 +17,16 @@ const getUserProfile = (): UserProfile => {
   };
 };
 
+/**
+ * GENERATE VEO VIDEO (Fixed Implementation)
+ * Uses the correct generateVideos method for Veo 3.1
+ */
 export const generateVeoVideo = async (
   imageUrls: string[], 
   prompt: string,
   onStatusUpdate?: (status: string) => void
 ): Promise<string> => {
+  // 1. Mandatory API Key Selection Check
   if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
     const hasKey = await (window as any).aistudio.hasSelectedApiKey();
     if (!hasKey) {
@@ -29,18 +34,20 @@ export const generateVeoVideo = async (
     }
   }
 
+  // 2. Fresh instance for latest API Key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const profile = getUserProfile();
-  onStatusUpdate?.("Initializing Veo Portrait Engine...");
+  onStatusUpdate?.("Initializing Veo 3.1 Engine...");
 
   try {
     const startImage = imageUrls[0].split(',')[1] || imageUrls[0];
     const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
 
-    // Carrying identity context into video generation to prevent gender drift
+    // 3. Proper generateVideos call for Veo 3.1
+    // Note: We DO NOT pass responseMimeType here to avoid 400 errors.
     let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: `${prompt}. The subject is a ${profile.gender}. Maintain strict identity consistency.`,
+      model: 'veo-3.1-generate-preview',
+      prompt: `${prompt}. The subject is a ${profile.gender} in their ${profile.ageRange}. Maintain strict identity consistency across all frames.`,
       image: {
         imageBytes: startImage,
         mimeType: 'image/png',
@@ -56,7 +63,7 @@ export const generateVeoVideo = async (
       }
     });
 
-    onStatusUpdate?.("Applying Style Safety Guardrails...");
+    onStatusUpdate?.("Simulating Runway Motion...");
 
     while (!operation.done) {
       await new Promise(resolve => setTimeout(resolve, 10000));
@@ -65,24 +72,24 @@ export const generateVeoVideo = async (
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) throw new Error("Video generation failed.");
+    if (!downloadLink) throw new Error("Video synthesis failed.");
 
     const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     const blob = await videoResponse.blob();
     return URL.createObjectURL(blob);
   } catch (err: any) {
-    console.error("Veo Error:", err);
+    console.error("Veo Synthesis Error:", err);
     throw err;
   }
 };
 
 const getRandomReassuringMessage = () => {
   const messages = [
-    "Ensuring garment continuity...",
-    "Verifying anatomical layering...",
-    "Finalizing cinematic textures...",
-    "Stitching full-body frames...",
-    "Polishing urban lighting..."
+    "Locking subject identity...",
+    "Verifying anatomical silhouettes...",
+    "Applying textile dynamics...",
+    "Stitching 9:16 cinematic frames...",
+    "Polishing atmospheric lighting..."
   ];
   return messages[Math.floor(Math.random() * messages.length)];
 };
@@ -94,17 +101,12 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
   
   const prompt = `
     Role: ${getUserRole()}
-    User Identity: ${profile.gender}, age ${profile.ageRange}.
-    Task: Suggest a complete, high-fashion outfit for ${weather.location} at ${displayTemp}°${unit}.
+    User Identity: ${profile.gender}, age range ${profile.ageRange}.
+    Task: Suggest a complete outfit for ${weather.location} at ${displayTemp}°${unit}.
     
-    IDENTITY ALIGNMENT: You MUST suggest clothing items that align with ${profile.gender} fashion standards and ${profile.ageRange} age bracket.
+    IDENTITY LOCK: You MUST suggest clothing items that align with ${profile.gender} fashion standards. 
+    Ensure the "lowerBody" is a specific garment (Trousers, Skirt, etc.) that matches a ${profile.gender} silhouette.
     
-    SAFETY & LOGIC MANDATE:
-    - You MUST provide a specific "lowerBody" garment. 
-    - Choices: Trousers, Chinos, Denim, Skirt, or Shorts.
-    - SHORTS POLICY: Only suggest shorts if the temperature is above 20°C (68°F) or for specific athletic/relaxed contexts. 
-    - Ensure the outfit is logically layered. No missing lower-body glitches.
-
     Aesthetic: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
   `;
 
@@ -117,9 +119,9 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            baseLayer: { type: Type.STRING, description: "Tops/Shirts" },
-            outerwear: { type: Type.STRING, description: "Coats/Jackets" },
-            lowerBody: { type: Type.STRING, description: "Trousers/Pants/Shorts/Skirt - MANDATORY" },
+            baseLayer: { type: Type.STRING },
+            outerwear: { type: Type.STRING },
+            lowerBody: { type: Type.STRING, description: "Trousers/Shorts/Skirt - MUST match gender profile" },
             footwear: { type: Type.STRING },
             proTip: { type: Type.STRING },
             styleReasoning: { type: Type.STRING },
@@ -151,27 +153,21 @@ export const generateOutfitImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const profile = getUserProfile();
   
-  // IDENTITY LOCK: Strictly binding the subject description to the profile data.
-  const subjectDescription = userImage 
+  const identityDescription = userImage 
     ? `the person in the reference image (who is a ${profile.gender})` 
     : `a stylish ${profile.gender} in their ${profile.ageRange}`;
 
   const prompt = `
-    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH HEAD-TO-TOE SHOT.
-    SUBJECT: ${subjectDescription}.
+    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH SHOT.
+    SUBJECT: ${identityDescription}.
     THEME: ${visualVariation || profile.styleArchetype}.
     PALETTE: ${paletteHint || profile.preferredPalette.join(', ')}.
-    MANDATORY GARMENTS (Must be clearly visible): 
-    1. ${outfit.outerwear} (Outer Layer)
-    2. ${outfit.baseLayer} (Inner Layer)
-    3. ${outfit.lowerBody} (Primary Lower Body - MUST RENDER CLEARLY)
-    4. ${outfit.footwear}
+    GARMENTS: ${outfit.outerwear}, ${outfit.baseLayer}, ${outfit.lowerBody}, ${outfit.footwear}.
     
-    QUALITY CONTROL & IDENTITY SAFETY: 
-    - Facial features, hair style, and body silhouette MUST match a ${profile.gender} subject. 
+    IDENTITY SAFETY GUARDRAIL: 
+    - Facial features and body silhouette MUST strictly match a ${profile.gender} subject. 
     - DO NOT mix gender traits. 
-    - NO male face on female clothing or vice versa. 
-    - Maintain ${profile.ageRange} age maturity.
+    - NO male features on female clothing or vice versa.
     
     ATMOSPHERE: ${weather.location} street scene.
   `.trim();
@@ -192,7 +188,7 @@ export const generateOutfitImage = async (
       return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
     }
   }
-  throw new Error("Generation failed to return pixels.");
+  throw new Error("Image synthesis failed.");
 };
 
 export const generateOutfitImages = async (

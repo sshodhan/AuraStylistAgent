@@ -1,37 +1,36 @@
-# Aura Identity Alignment & Rendering Guide (v2.4)
+# Aura Identity Alignment & Rendering Guide (v2.5)
 
-This guide outlines the mandatory protocols for maintaining subject identity (Gender & Age) across Aura’s Reasoning, Vision, and Motion engines.
+This document is the "Source of Truth" for maintaining subject identity (Gender, Age, and Physique) across Aura's reasoning, vision, and motion pipelines.
 
-## 1. The Core Problem: Gender-Clashing
-"Gender-clashing" occurs when the AI reasoning suggests female-coded garments (e.g., "Midi Skirt") but the visual model renders a male-coded subject because the "Subject" prompt was too vague.
+## 1. The "Identity Lock" Architecture
+To prevent "gender-clashing" (e.g., a male face appearing on female-coded garments), the application must enforce an **Identity Lock** at every stage of the generative pipeline.
 
-## 2. The Identity Lock Protocol
-To prevent this, developers must ensure the `gender` and `ageRange` tokens are injected into **three distinct layers**:
+### Layer 1: Semantic Reasoning (The Stylist)
+The `getOutfitSuggestion` function must receive the user's `gender` and `ageRange`.
+- **Developer Instruction**: The prompt must explicitly state: *"Suggest silhouettes that strictly align with [Gender] fashion standards."*
+- **Purpose**: This ensures the text-based labels (e.g., "Tailored Chinos") match the visual expectations of the next engine.
 
-### A. Semantic Layer (Reasoning)
-The `getOutfitSuggestion` function must pass the user's gender and age to the LLM.
-- **Goal**: Ensure the generated `OutfitSuggestion` JSON contains garments that logically match the subject's anatomy and societal style norms.
-- **Instruction**: "Suggest silhouettes that strictly align with [gender] fashion standards."
+### Layer 2: Visual Synthesis (The Virtual Mirror)
+The `generateOutfitImage` function uses `gemini-3-pro-image-preview`.
+- **Anchor Point**: The subject must be described as: *"A stylish [Gender] in their [AgeRange]"*.
+- **Quality Guardrail**: You must append a negative constraint block:
+  > *"CRITICAL: Ensure facial features and body silhouette strictly match a [Gender] subject. DO NOT mix gender traits. No male features on female clothing or vice versa."*
 
-### B. Vision Layer (Image Synthesis)
-The `generateOutfitImage` function must use the **Identity Anchor** as the primary subject token.
-- **Logic**: Instead of a generic "stylish person," the prompt must start with: `A stylish [Gender] in their [AgeRange]`.
-- **Quality Control Block**: Every image prompt must include a directive: *"Ensure facial features and body silhouette strictly match a [Gender] subject. Do not mix gender traits."*
+### Layer 3: Motion Synthesis (The Runway)
+The `generateVeoVideo` function uses `veo-3.1-generate-preview`.
+- **Consistency**: The motion prompt must carry the same identity tokens used in Layer 2.
+- **Protocol**: If an `image` (start frame) and `lastFrame` (end frame) are provided, the prompt must reinforce: *"The subject in both frames is a [Gender]. Maintain strict identity consistency throughout the motion."*
 
-### C. Motion Layer (Veo Synthesis)
-When generating video, the `prompt` must carry the `gender` token to ensure the model doesn't "re-roll" the person's gender during the runway animation.
+## 2. Technical API Implementation (Veo 3.1)
+The Veo model is a **Video Generation model**, not a text model.
+- **Correct Method**: `ai.models.generateVideos(...)`.
+- **Prohibited Config**: Do NOT pass `responseMimeType` or `responseSchema` to the Veo model. Doing so will result in a `400 INVALID_ARGUMENT` error.
+- **Aspect Ratio**: Always use `9:16` for portrait mobile experiences or `16:9` for landscape.
 
-## 3. Data Flow Architecture
-```typescript
-// 1. Storage: Persisted in localStorage as 'aura_gender' and 'aura_age_range'
-// 2. Retrieval: UserProfile object in geminiService.ts
-// 3. Injection: Hard-coded into prompt templates
-```
-
-## 4. Developer Guardrails
-- **DO NOT** use neutral terms like "they" or "them" in the visual prompt if a specific gender is selected; use the explicit gender token.
-- **DO NOT** allow the user to generate an image if the `gender` or `ageRange` fields are empty (defaults: Female, 30s).
-- **MANDATORY**: For high-quality results, the `ageRange` token helps the model pick appropriate skin textures and facial maturity, preventing "baby-faced" or "ageless" hallucinations.
+## 3. Data Flow Persistence
+1. User selects Identity Core in `SettingsTab.tsx`.
+2. Data is saved to `localStorage` (`aura_gender`, `aura_age_range`).
+3. `geminiService.ts` retrieves these tokens via `getUserProfile()` before every API call.
 
 ---
-*Aura Identity & Safety Team | March 2025*
+*Aura Identity & Safety Engineering | March 2025*
