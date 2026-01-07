@@ -3,9 +3,9 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile, VideoResolution } from "../types";
 
 /**
- * IDENTITY-LOCKED VEO GENERATION
- * Architectural Choice: uses 720p and Fast model to maximize Vercel performance.
- * Resilience: Handles both single-image (start only) and dual-image (start + end) inputs.
+ * LIKENESS-PRESERVING VEO ENGINE
+ * Optimized for Vercel & Single Photo Inputs.
+ * Uses 720p Fast model for 200 ops/day quota.
  */
 export const generateVeoVideo = async (
   imageUrls: string[], 
@@ -13,74 +13,80 @@ export const generateVeoVideo = async (
   resolution: VideoResolution = '720p',
   onStatusUpdate?: (status: string) => void
 ): Promise<string> => {
+  // Ensure the user has selected their key via AI Studio protocol if applicable
   if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
     const hasKey = await (window as any).aistudio.hasSelectedApiKey();
     if (!hasKey) await (window as any).aistudio.openSelectKey();
   }
 
+  // Create a fresh instance for Vercel/Key sync
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const gender = localStorage.getItem('aura_gender') || "Female";
-  const age = localStorage.getItem('aura_age_range') || "30s";
+  const archetype = localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist";
 
   onStatusUpdate?.("Anchoring Identity...");
 
   try {
-    const startBase64 = imageUrls[0].split(',')[1] || imageUrls[0];
+    // Extract raw base64 data from the source image
+    const sourceBase64 = imageUrls[0].split(',')[1] || imageUrls[0];
     
-    // Check if we have a second image to use as an end-anchor
-    const hasEndAnchor = imageUrls.length > 1;
-    const endBase64 = hasEndAnchor ? (imageUrls[1].split(',')[1] || imageUrls[1]) : null;
-
+    // THE LIKENESS LOCK PROMPT:
+    // This prompt forces the model to respect the provided image as the identity "seed".
     const identityPrompt = `
-      SUBJECT: A stylish ${gender} in their ${age}. 
-      ACTION: ${userPrompt || "A professional runway walk towards the camera"}.
-      ENVIRONMENT: Urban backdrop, soft cinematic fashion lighting.
-      IDENTITY: Preserve 1:1 likeness of the subject and the specific outfit provided. 
-      No garment morphing. No facial shifting.
+      CINEMATIC RUNWAY: ${userPrompt || "A professional runway walk towards the camera"}.
+      SUBJECT: The exact ${gender} from the reference image. 
+      STYLE DNA: ${archetype}.
+      IDENTITY LOCK: Maintain 1:1 likeness of the subject's face, hair, and clothing from the reference frame. 
+      DO NOT alter the outfit. DO NOT morph the facial structure. 
+      ATMOSPHERE: High-fashion lighting, blurred urban background.
+      MOTION: Natural, fluid human motion.
     `.trim();
 
-    onStatusUpdate?.(`Generating 720p Motion (${hasEndAnchor ? 'Dual' : 'Single'} Anchor)...`);
+    onStatusUpdate?.("Initializing 720p Synthesis...");
 
-    // Prepare video config
-    const videoConfig: any = {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: '9:16'
-    };
-
-    // If we have a second photo, use it to lock the ending state
-    if (hasEndAnchor && endBase64) {
-      videoConfig.lastFrame = {
-        imageBytes: endBase64,
-        mimeType: 'image/png',
-      };
-    }
-
-    const operation = await ai.models.generateVideos({
+    // Start long-running generation
+    let operation = await ai.models.generateVideos({
       model: 'veo-3.1-fast-generate-preview',
       prompt: identityPrompt,
       image: {
-        imageBytes: startBase64,
+        imageBytes: sourceBase64,
         mimeType: 'image/png',
       },
-      config: videoConfig
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: '9:16'
+      }
     });
 
-    let finalOp = operation;
-    while (!finalOp.done) {
-      await new Promise(resolve => setTimeout(resolve, 8000));
-      onStatusUpdate?.("Interpolating Persona...");
-      finalOp = await ai.operations.getVideosOperation({ operation: finalOp });
+    // VERCEL POLLING LOOP: 
+    // Prevents function timeouts by polling the status from the browser.
+    let pollCount = 0;
+    while (!operation.done) {
+      pollCount++;
+      await new Promise(resolve => setTimeout(resolve, 8000)); // Poll every 8 seconds
+      
+      const statuses = [
+        "Analyzing Fabric Physics...",
+        "Rendering Motion Frames...",
+        "Finalizing Lighting...",
+        "Polishing Persona...",
+        "Identity Check Active..."
+      ];
+      onStatusUpdate?.(statuses[pollCount % statuses.length]);
+      
+      operation = await ai.operations.getVideosOperation({ operation });
     }
 
-    const downloadLink = finalOp.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) throw new Error("Synthesis failed.");
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) throw new Error("Synthesis failed to produce a valid link.");
 
+    // Fetch the MP4 with the API key
     const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     const blob = await videoResponse.blob();
     return URL.createObjectURL(blob);
   } catch (err: any) {
-    console.error("Veo Engine Error:", err);
+    console.error("Vercel Veo Error:", err);
     throw err;
   }
 };
@@ -122,7 +128,7 @@ export const getOutfitSuggestion = async (weather: WeatherData, context: string 
 export const generateOutfitImages = async (outfit: OutfitSuggestion, weather: WeatherData, size: any, unit: any, userImage?: string): Promise<string[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const gender = localStorage.getItem('aura_gender') || "Female";
-  const prompt = `Full body fashion photography. A ${gender} wearing ${outfit.outerwear} and ${outfit.lowerBody}. Location: ${weather.location} street.`;
+  const prompt = `Full body fashion photography. A ${gender} wearing ${outfit.outerwear}, ${outfit.baseLayer} and ${outfit.lowerBody}. Location: ${weather.location} street. Clear visibility.`;
   
   const response: any = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
@@ -134,7 +140,6 @@ export const generateOutfitImages = async (outfit: OutfitSuggestion, weather: We
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) urls.push(`data:image/png;base64,${part.inlineData.data}`);
   }
-  // Return whatever we got. Even one image is now valid for the updated generateVeoVideo logic.
   return urls;
 };
 
