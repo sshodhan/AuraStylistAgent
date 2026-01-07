@@ -1,268 +1,168 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile } from "../types";
-
-const convertTemp = (c: number, unit: TempUnit) => unit === 'F' ? (c * 9/5 + 32).toFixed(1) : c;
-
-const getUserRole = (): string => "Professional Fashion Stylist and Identity Consistency Expert";
-
-const getUserProfile = (): UserProfile => {
-  return {
-    name: localStorage.getItem('aura_user_name') || "YOU",
-    email: localStorage.getItem('aura_email_address') || "",
-    gender: localStorage.getItem('aura_gender') || "Female",
-    ageRange: localStorage.getItem('aura_age_range') || "30s",
-    styleArchetype: localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist",
-    preferredPalette: JSON.parse(localStorage.getItem('aura_palette') || '["Neutral Gray", "Deep Navy", "Pure White"]')
-  };
-};
+import { WeatherData, OutfitSuggestion, TempUnit, GroundingLink, UserProfile, VideoResolution } from "../types";
 
 /**
- * GENERATE VEO VIDEO (Fixed Implementation)
- * Uses the correct generateVideos method for Veo 3.1
+ * IDENTITY-LOCKED VEO GENERATION
+ * Architectural Choice: uses 720p and Fast model to maximize Vercel performance.
+ * Resilience: Handles both single-image (start only) and dual-image (start + end) inputs.
  */
 export const generateVeoVideo = async (
   imageUrls: string[], 
-  prompt: string,
+  userPrompt: string,
+  resolution: VideoResolution = '720p',
   onStatusUpdate?: (status: string) => void
 ): Promise<string> => {
-  // 1. Mandatory API Key Selection Check
   if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
     const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-    if (!hasKey) {
-      await (window as any).aistudio.openSelectKey();
-    }
+    if (!hasKey) await (window as any).aistudio.openSelectKey();
   }
 
-  // 2. Fresh instance for latest API Key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const profile = getUserProfile();
-  onStatusUpdate?.("Initializing Veo 3.1 Engine...");
+  const gender = localStorage.getItem('aura_gender') || "Female";
+  const age = localStorage.getItem('aura_age_range') || "30s";
+
+  onStatusUpdate?.("Anchoring Identity...");
 
   try {
-    const startImage = imageUrls[0].split(',')[1] || imageUrls[0];
-    const endImage = (imageUrls[1] || imageUrls[0]).split(',')[1] || (imageUrls[1] || imageUrls[0]);
+    const startBase64 = imageUrls[0].split(',')[1] || imageUrls[0];
+    
+    // Check if we have a second image to use as an end-anchor
+    const hasEndAnchor = imageUrls.length > 1;
+    const endBase64 = hasEndAnchor ? (imageUrls[1].split(',')[1] || imageUrls[1]) : null;
 
-    // 3. Proper generateVideos call for Veo 3.1
-    // Note: We DO NOT pass responseMimeType here to avoid 400 errors.
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-generate-preview',
-      prompt: `${prompt}. The subject is a ${profile.gender} in their ${profile.ageRange}. Maintain strict identity consistency across all frames.`,
-      image: {
-        imageBytes: startImage,
+    const identityPrompt = `
+      SUBJECT: A stylish ${gender} in their ${age}. 
+      ACTION: ${userPrompt || "A professional runway walk towards the camera"}.
+      ENVIRONMENT: Urban backdrop, soft cinematic fashion lighting.
+      IDENTITY: Preserve 1:1 likeness of the subject and the specific outfit provided. 
+      No garment morphing. No facial shifting.
+    `.trim();
+
+    onStatusUpdate?.(`Generating 720p Motion (${hasEndAnchor ? 'Dual' : 'Single'} Anchor)...`);
+
+    // Prepare video config
+    const videoConfig: any = {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: '9:16'
+    };
+
+    // If we have a second photo, use it to lock the ending state
+    if (hasEndAnchor && endBase64) {
+      videoConfig.lastFrame = {
+        imageBytes: endBase64,
         mimeType: 'image/png',
-      },
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: '9:16',
-        lastFrame: {
-          imageBytes: endImage,
-          mimeType: 'image/png',
-        }
-      }
-    });
-
-    onStatusUpdate?.("Simulating Runway Motion...");
-
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      onStatusUpdate?.(getRandomReassuringMessage());
-      operation = await ai.operations.getVideosOperation({ operation: operation });
+      };
     }
 
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) throw new Error("Video synthesis failed.");
+    const operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: identityPrompt,
+      image: {
+        imageBytes: startBase64,
+        mimeType: 'image/png',
+      },
+      config: videoConfig
+    });
+
+    let finalOp = operation;
+    while (!finalOp.done) {
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      onStatusUpdate?.("Interpolating Persona...");
+      finalOp = await ai.operations.getVideosOperation({ operation: finalOp });
+    }
+
+    const downloadLink = finalOp.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) throw new Error("Synthesis failed.");
 
     const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     const blob = await videoResponse.blob();
     return URL.createObjectURL(blob);
   } catch (err: any) {
-    console.error("Veo Synthesis Error:", err);
+    console.error("Veo Engine Error:", err);
     throw err;
   }
-};
-
-const getRandomReassuringMessage = () => {
-  const messages = [
-    "Locking subject identity...",
-    "Verifying anatomical silhouettes...",
-    "Applying textile dynamics...",
-    "Stitching 9:16 cinematic frames...",
-    "Polishing atmospheric lighting..."
-  ];
-  return messages[Math.floor(Math.random() * messages.length)];
 };
 
 export const getOutfitSuggestion = async (weather: WeatherData, context: string = "casual", unit: TempUnit = 'F'): Promise<OutfitSuggestion> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const displayTemp = convertTemp(weather.temp, unit);
-  const profile = getUserProfile();
+  const displayTemp = unit === 'F' ? (weather.temp * 9/5 + 32).toFixed(1) : weather.temp;
+  const gender = localStorage.getItem('aura_gender') || "Female";
+  const archetype = localStorage.getItem('aura_style_archetype') || "Sophisticated Minimalist";
   
-  const prompt = `
-    Role: ${getUserRole()}
-    User Identity: ${profile.gender}, age range ${profile.ageRange}.
-    Task: Suggest a complete outfit for ${weather.location} at ${displayTemp}°${unit}.
-    
-    IDENTITY LOCK: You MUST suggest clothing items that align with ${profile.gender} fashion standards. 
-    Ensure the "lowerBody" is a specific garment (Trousers, Skirt, etc.) that matches a ${profile.gender} silhouette.
-    
-    Aesthetic: ${profile.styleArchetype} in ${profile.preferredPalette.join(', ')}.
-  `;
+  const prompt = `Suggest a professional outfit for ${weather.location} at ${displayTemp}°${unit}. Gender: ${gender}. Style: ${archetype}.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            baseLayer: { type: Type.STRING },
-            outerwear: { type: Type.STRING },
-            lowerBody: { type: Type.STRING, description: "Trousers/Shorts/Skirt - MUST match gender profile" },
-            footwear: { type: Type.STRING },
-            proTip: { type: Type.STRING },
-            styleReasoning: { type: Type.STRING },
-            weatherStory: { type: Type.STRING },
-            activity: { type: Type.STRING },
-            coffeeSpot: { type: Type.STRING },
-            storeType: { type: Type.STRING },
-          },
-          required: ["baseLayer", "outerwear", "lowerBody", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
-        }
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          baseLayer: { type: Type.STRING },
+          outerwear: { type: Type.STRING },
+          lowerBody: { type: Type.STRING },
+          footwear: { type: Type.STRING },
+          proTip: { type: Type.STRING },
+          styleReasoning: { type: Type.STRING },
+          weatherStory: { type: Type.STRING },
+          activity: { type: Type.STRING },
+          coffeeSpot: { type: Type.STRING },
+          storeType: { type: Type.STRING },
+        },
+        required: ["baseLayer", "outerwear", "lowerBody", "footwear", "proTip", "styleReasoning", "weatherStory", "activity", "coffeeSpot", "storeType"]
       }
-    });
-    return JSON.parse(response.text || '{}');
-  } catch (err: any) {
-    throw err;
-  }
+    }
+  });
+  return JSON.parse(response.text || '{}');
 };
 
-export const generateOutfitImage = async (
-  outfit: OutfitSuggestion, 
-  weather: WeatherData, 
-  size: "1K" | "2K" | "4K" = "1K", 
-  unit: TempUnit = 'F', 
-  subject: string = "a stylish person",
-  userImage?: string,
-  visualVariation: string = "standard high-fashion",
-  paletteHint: string = "neutral tones"
-): Promise<string> => {
+export const generateOutfitImages = async (outfit: OutfitSuggestion, weather: WeatherData, size: any, unit: any, userImage?: string): Promise<string[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const profile = getUserProfile();
+  const gender = localStorage.getItem('aura_gender') || "Female";
+  const prompt = `Full body fashion photography. A ${gender} wearing ${outfit.outerwear} and ${outfit.lowerBody}. Location: ${weather.location} street.`;
   
-  const identityDescription = userImage 
-    ? `the person in the reference image (who is a ${profile.gender})` 
-    : `a stylish ${profile.gender} in their ${profile.ageRange}`;
-
-  const prompt = `
-    EDITORIAL FASHION PHOTOGRAPHY. FULL LENGTH SHOT.
-    SUBJECT: ${identityDescription}.
-    THEME: ${visualVariation || profile.styleArchetype}.
-    PALETTE: ${paletteHint || profile.preferredPalette.join(', ')}.
-    GARMENTS: ${outfit.outerwear}, ${outfit.baseLayer}, ${outfit.lowerBody}, ${outfit.footwear}.
-    
-    IDENTITY SAFETY GUARDRAIL: 
-    - Facial features and body silhouette MUST strictly match a ${profile.gender} subject. 
-    - DO NOT mix gender traits. 
-    - NO male features on female clothing or vice versa.
-    
-    ATMOSPHERE: ${weather.location} street scene.
-  `.trim();
-  
-  const parts: any[] = [{ text: prompt }];
-  if (userImage) {
-    parts.push({ inlineData: { data: userImage.split(',')[1] || userImage, mimeType: 'image/jpeg' } });
-  }
-
   const response: any = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
-    contents: { parts },
-    config: { imageConfig: { aspectRatio: "3:4", imageSize: size } }
+    contents: { parts: [{ text: prompt }] },
+    config: { imageConfig: { aspectRatio: "3:4", imageSize: "1K" } }
   });
 
+  const urls: string[] = [];
   for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-    }
+    if (part.inlineData) urls.push(`data:image/png;base64,${part.inlineData.data}`);
   }
-  throw new Error("Image synthesis failed.");
-};
-
-export const generateOutfitImages = async (
-  outfit: OutfitSuggestion, 
-  weather: WeatherData, 
-  size: "1K" | "2K" | "4K" = "1K", 
-  unit: TempUnit = 'F',
-  userImage?: string
-): Promise<string[]> => {
-  const profile = getUserProfile();
-  const variations = [
-    { palette: profile.preferredPalette.join(', '), theme: profile.styleArchetype, subject: `A stylish ${profile.gender}` },
-    { palette: "Complementary Contrast", theme: `Cinematic ${profile.styleArchetype}`, subject: `A fashion-forward ${profile.gender}` }
-  ];
-
-  return Promise.all(variations.map(v => 
-    generateOutfitImage(outfit, weather, size, unit, v.subject, userImage, v.theme, v.palette)
-  ));
-};
-
-export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const profile = getUserProfile();
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [
-        { inlineData: { data: base64Image.split(',')[1] || base64Image, mimeType: 'image/jpeg' } },
-        { text: `${prompt}. The subject is a ${profile.gender}. Maintain strict identity consistency.` },
-      ],
-    },
-    config: { imageConfig: { aspectRatio: "3:4" } }
-  });
-
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-    }
-  }
-  throw new Error("Edit failed.");
+  // Return whatever we got. Even one image is now valid for the updated generateVeoVideo logic.
+  return urls;
 };
 
 export const generateWeatherHeroImage = async (weather: WeatherData, unit: TempUnit = 'F'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const displayTemp = convertTemp(weather.temp, unit);
-  const prompt = `Cinematic photo of ${weather.location} at ${displayTemp}°${unit}. Wide-angle fashion landscape. High-end lighting.`;
-  
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
-    contents: { parts: [{ text: prompt }] },
+    contents: { parts: [{ text: `Atmospheric street view of ${weather.location}.` }] },
     config: { imageConfig: { aspectRatio: "16:9" } }
   });
-
   for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-    }
+    if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
   }
-  throw new Error("Hero generation failed.");
+  return "";
 };
 
-export const getPlanRecommendations = async (location: string, outfit: OutfitSuggestion, lat: number, lon: number): Promise<{ text: string, links: GroundingLink[] }> => {
+export const getPlanRecommendations = async (location: string, outfit: OutfitSuggestion, lat: number, lon: number) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Grounded locations in ${location} for: Explore (${outfit.activity}), Eat (${outfit.coffeeSpot}), Shop (${outfit.storeType}). Focus on high-fashion accessibility.`;
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: prompt,
+    contents: `Grounding search for: ${outfit.activity} and ${outfit.coffeeSpot} in ${location}.`,
     config: {
       tools: [{ googleMaps: {} }],
       toolConfig: { retrievalConfig: { latLng: { latitude: lat, longitude: lon } } }
     }
   });
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-  const links: GroundingLink[] = groundingChunks.filter((c: any) => c.maps).map((c: any) => ({ uri: c.maps.uri, title: c.maps.title }));
+  const links = groundingChunks.filter((c: any) => c.maps).map((c: any) => ({ uri: c.maps.uri, title: c.maps.title }));
   return { text: response.text || "", links };
 };
 

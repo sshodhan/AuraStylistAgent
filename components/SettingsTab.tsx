@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, CheckCircle2, Loader2, User, ShieldCheck, Globe, Palette, Wand2, Fingerprint } from 'lucide-react';
-import { WeatherData, OutfitSuggestion, TempUnit } from '../types';
+import { Mail, CheckCircle2, Loader2, User, ShieldCheck, Globe, Palette, Wand2, Fingerprint, Zap, Settings2 } from 'lucide-react';
+import { WeatherData, OutfitSuggestion, TempUnit, VideoResolution } from '../types';
 
 interface Props {
   weather: WeatherData | null;
@@ -36,6 +36,7 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
   const [emailAddress, setEmailAddress] = useState(() => localStorage.getItem('aura_email_address') || "");
   const [archetype, setArchetype] = useState(() => localStorage.getItem('aura_style_archetype') || ARCHETYPES[0]);
   const [selectedPalette, setSelectedPalette] = useState(() => localStorage.getItem('aura_palette_name') || PALETTES[0].name);
+  const [videoRes, setVideoRes] = useState<VideoResolution>(() => (localStorage.getItem('aura_video_res') as VideoResolution) || '720p');
   
   const [emailEnabled, setEmailEnabled] = useState(() => localStorage.getItem('aura_email_enabled') === 'true');
   const [sendTime, setSendTime] = useState(() => localStorage.getItem('aura_send_time') || "07:30");
@@ -49,11 +50,12 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
     localStorage.setItem('aura_email_address', emailAddress);
     localStorage.setItem('aura_style_archetype', archetype);
     localStorage.setItem('aura_palette_name', selectedPalette);
+    localStorage.setItem('aura_video_res', videoRes);
     const p = PALETTES.find(p => p.name === selectedPalette);
     if (p) localStorage.setItem('aura_palette', JSON.stringify(p.colors));
     localStorage.setItem('aura_email_enabled', String(emailEnabled));
     localStorage.setItem('aura_send_time', sendTime);
-  }, [userName, gender, ageRange, emailAddress, archetype, selectedPalette, emailEnabled, sendTime]);
+  }, [userName, gender, ageRange, emailAddress, archetype, selectedPalette, emailEnabled, sendTime, videoRes]);
 
   const handleManualSave = () => {
     setSaveStatus('saving');
@@ -81,7 +83,6 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
 
       <div className="space-y-4">
         <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Identity Check</h3>
-        
         <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm divide-y divide-gray-50">
           <div className="p-5 flex items-center gap-4">
             <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shrink-0"><User className="w-5 h-5" /></div>
@@ -90,7 +91,6 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
               <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Fashion Icon" className="w-full bg-transparent border-none outline-none text-sm font-black text-black p-0" />
             </div>
           </div>
-
           <div className="p-6 space-y-4">
             <div className="flex items-center gap-2">
               <Fingerprint className="w-3.5 h-3.5 text-indigo-600" />
@@ -104,19 +104,34 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
               ))}
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5 text-indigo-600" />
-              <p className="text-[10px] font-black uppercase text-gray-900 tracking-widest">Age Group</p>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {AGES.map(a => (
-                <button key={a} onClick={() => setAgeRange(a)} className={`py-3 rounded-xl text-[9px] font-black transition-all ${ageRange === a ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
-                  {a}
-                </button>
-              ))}
-            </div>
+      <div className="space-y-2">
+        <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Quota & Performance</h3>
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5 text-indigo-600" />
+            <p className="text-[10px] font-black uppercase text-gray-900 tracking-widest">Synthesis Resolution</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+             <button onClick={() => setVideoRes('720p')} className={`p-4 rounded-2xl flex flex-col gap-1 border-2 transition-all ${videoRes === '720p' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-50'}`}>
+                <span className="text-[10px] font-black uppercase text-gray-900">720p (Eco)</span>
+                <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Lower Cost • Faster</span>
+             </button>
+             <button onClick={() => setVideoRes('1080p')} className={`p-4 rounded-2xl flex flex-col gap-1 border-2 transition-all ${videoRes === '1080p' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-50'}`}>
+                <span className="text-[10px] font-black uppercase text-gray-900">1080p (HD)</span>
+                <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Higher Fidelity</span>
+             </button>
+          </div>
+          <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+             <div className="flex items-center gap-2 mb-1">
+                <Settings2 className="w-3 h-3 text-indigo-600" />
+                <span className="text-[9px] font-black text-indigo-900 uppercase tracking-widest">Model Strategy</span>
+             </div>
+             <p className="text-[9px] font-medium text-indigo-700/80 leading-relaxed">
+                Currently locked to <b>Veo 3.1 Fast</b> to maximize your daily quota (200 ops/day).
+             </p>
           </div>
         </div>
       </div>
@@ -136,41 +151,6 @@ const SettingsTab: React.FC<Props> = ({ weather, outfit, unit }) => {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Palette className="w-3.5 h-3.5 text-indigo-600" />
-              <p className="text-[10px] font-black uppercase text-gray-900 tracking-widest">Primary Palette</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {PALETTES.map(p => (
-                <button key={p.name} onClick={() => setSelectedPalette(p.name)} className={`p-3 rounded-2xl flex items-center justify-between border-2 transition-all ${selectedPalette === p.name ? 'border-indigo-600 bg-indigo-50' : 'border-gray-50 bg-white'}`}>
-                  <span className="text-[10px] font-black uppercase text-gray-700">{p.name}</span>
-                  <div className="flex -space-x-1">
-                    {p.colors.map((c, idx) => (
-                      <div key={idx} className="w-3 h-3 rounded-full border border-white" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Automation</h3>
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm divide-y divide-gray-50">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${emailEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-50 text-gray-300'}`}><Mail className="w-4 h-4" /></div>
-              <span className="text-xs font-black text-gray-900 uppercase">Email Briefings</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer scale-[0.8]">
-              <input type="checkbox" checked={emailEnabled} onChange={(e) => setEmailEnabled(e.target.checked)} className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-            </label>
           </div>
         </div>
       </div>

@@ -1,11 +1,13 @@
 
 export type TempUnit = 'C' | 'F';
+export type VideoResolution = '720p' | '1080p';
+export type ImageResolution = '1K' | '2K' | '4K';
 
 export interface UserProfile {
   name: string;
   email: string;
-  gender: string; // NEW: Male, Female, Non-Binary
-  ageRange: string; // NEW: 20s, 30s, 40s, 50+
+  gender: string;
+  ageRange: string;
   styleArchetype: string; 
   preferredPalette: string[]; 
   bodyType?: string;
@@ -13,7 +15,7 @@ export interface UserProfile {
 }
 
 export interface WeatherData {
-  temp: number; // Stored in Celsius
+  temp: number;
   precip: number;
   wind: number;
   location: string;
